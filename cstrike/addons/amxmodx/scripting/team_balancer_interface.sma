@@ -37,11 +37,16 @@ new const g_clcmds[][][32 + 1] =
   {"/skill", "handle_say_skill"}
 };
 
+new g_pcvar_delay_before_start;
+new g_pcvar_forced_balancing_interval;
+
 new g_pcvar_skill_menu_access_flag;
 new g_pcvar_player_skill_access_flag;
 new g_pcvar_player_info_access_flag;
 new g_pcvar_allow_force_balancing;
 new g_pcvar_force_balance_access_flag;
+
+new g_xid_rounds_since_last_balance_check;
 
 new g_players[MAX_PLAYERS + 1][e_player];
 new Array:g_pids;
@@ -71,6 +76,14 @@ public plugin_end()
     ArrayDestroy(g_players[ArrayGetCell(g_pids, i)][player_menu_pids]);
   }
   ArrayDestroy(g_pids);
+}
+
+public plugin_cfg()
+{
+  g_pcvar_delay_before_start        = get_cvar_pointer("tb_delay_before_start");
+  g_pcvar_forced_balancing_interval = get_cvar_pointer("tb_forced_balancing_interval");
+
+  g_xid_rounds_since_last_balance_check = get_xvar_id("g_rounds_since_last_balance_check");
 }
 
 public client_putinserver(pid)
@@ -187,11 +200,10 @@ show_skill_menu(const pid)
   );
 
   if (display_force_balancing_item) {
-    new Float:time_left =
-      get_pcvar_float(get_xvar_num(get_xvar_id("g_pcvar_delay_before_start"))) - get_gametime();
+    new Float:time_left = get_pcvar_float(g_pcvar_delay_before_start) - get_gametime();
     new rounds_left =
-      get_pcvar_num(get_xvar_num(get_xvar_id("g_pcvar_forced_balancing_interval"))) -
-      get_xvar_num(get_xvar_id("g_rounds_since_last_balance_check"));
+      get_pcvar_num(g_pcvar_forced_balancing_interval) -
+      get_xvar_num(g_xid_rounds_since_last_balance_check);
 
     if (time_left > 0) {
       add_fmt_menu_item(

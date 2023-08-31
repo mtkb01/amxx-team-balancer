@@ -38,12 +38,12 @@ new g_pcvar_min_diff_global_delta;
 new g_pcvar_min_diff_local_delta;
 new g_pcvar_player_count_threshold;
 new g_pcvar_max_transfers_per_team;
-public g_pcvar_delay_before_start;
+new g_pcvar_delay_before_start;
 new g_pcvar_balance_check_trigger;
 new g_pcvar_rounds_between_balancing;
 new g_pcvar_immunity_type;
 new g_pcvar_immunity_amount;
-public g_pcvar_forced_balancing_interval;
+new g_pcvar_forced_balancing_interval;
 
 new g_fw_checking_balance;
 new g_fw_balance_checked;
