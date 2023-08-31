@@ -55,11 +55,11 @@ public plugin_init()
 {
   register_plugin(PLUGIN, VERSION, AUTHOR);
 
-  g_pcvar_skill_menu_access_flag    = register_cvar("tb_interface_skill_menu_access_flag", "");
-  g_pcvar_player_skill_access_flag  = register_cvar("tb_interface_player_skill_access_flag", "");
-  g_pcvar_player_info_access_flag   = register_cvar("tb_interface_player_info_access_flag", "l");
-  g_pcvar_allow_force_balancing     = register_cvar("tb_interface_allow_force_balancing", "1");
-  g_pcvar_force_balance_access_flag = register_cvar("tb_interface_force_balance_access_flag", "l");
+  g_pcvar_skill_menu_access_flag    = register_cvar("tb_ui_skill_menu_access_flag", "");
+  g_pcvar_player_skill_access_flag  = register_cvar("tb_ui_player_skill_access_flag", "");
+  g_pcvar_player_info_access_flag   = register_cvar("tb_ui_player_info_access_flag", "l");
+  g_pcvar_allow_force_balancing     = register_cvar("tb_ui_allow_force_balancing", "1");
+  g_pcvar_force_balance_access_flag = register_cvar("tb_ui_force_balance_access_flag", "l");
 
   register_clcmd("say", "clcmd_say");
   register_clcmd("say_team", "clcmd_say");
