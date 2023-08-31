@@ -165,7 +165,7 @@ _Note: the min. and max. values are not currently enforced, and are only provide
   </tr>
   <tr><td colspan="6" align="center">Notify</td></tr>
   <tr>
-    <td><code>tb_notify_prefix</code></td>
+    <td><code>tb_info_prefix</code></td>
     <td align="center">string</td>
     <td align="center"><code>"^3[TB]^1 "</code></td>
     <td align="center">0 (chars)</td>
@@ -173,7 +173,7 @@ _Note: the min. and max. values are not currently enforced, and are only provide
     <td>Prefix printed before every chat message issued by the plugin.</td>
   </tr>
   <tr>
-    <td><code>tb_notify_print_names_to_console</code></td>
+    <td><code>tb_info_print_names_to_console</code></td>
     <td align="center">boolean</td>
     <td align="center">0</td>
     <td align="center">0</td>
@@ -185,7 +185,7 @@ _Note: the min. and max. values are not currently enforced, and are only provide
     </td>
   </tr>
   <tr>
-    <td><code>tb_notify_checking_balance</code></td>
+    <td><code>tb_info_checking_balance</code></td>
     <td align="center">boolean</td>
     <td align="center">1</td>
     <td align="center">0</td>
@@ -197,7 +197,7 @@ _Note: the min. and max. values are not currently enforced, and are only provide
     </td>
   </tr>
   <tr>
-    <td><code>tb_notify_balance_check_results</code></td>
+    <td><code>tb_info_balance_check_results</code></td>
     <td align="center">boolean</td>
     <td align="center">1</td>
     <td align="center">0</td>
@@ -209,7 +209,7 @@ _Note: the min. and max. values are not currently enforced, and are only provide
     </td>
   </tr>
   <tr>
-    <td><code>tb_notify_forced_balancing</code></td>
+    <td><code>tb_info_forced_balancing</code></td>
     <td align="center">boolean</td>
     <td align="center">1</td>
     <td align="center">0</td>
@@ -221,7 +221,7 @@ _Note: the min. and max. values are not currently enforced, and are only provide
     </td>
   </tr>
   <tr>
-    <td><code>tb_notify_transfers</code></td>
+    <td><code>tb_info_transfers</code></td>
     <td align="center">boolean</td>
     <td align="center">1</td>
     <td align="center">0</td>
@@ -233,7 +233,7 @@ _Note: the min. and max. values are not currently enforced, and are only provide
     </td>
   </tr>
   <tr>
-    <td><code>tb_notify_switches</code></td>
+    <td><code>tb_info_switches</code></td>
     <td align="center">boolean</td>
     <td align="center">1</td>
     <td align="center">0</td>
@@ -245,7 +245,7 @@ _Note: the min. and max. values are not currently enforced, and are only provide
     </td>
   </tr>
   <tr>
-    <td><code>tb_notify_balancing_failed</code></td>
+    <td><code>tb_info_balancing_failed</code></td>
     <td align="center">boolean</td>
     <td align="center">1</td>
     <td align="center">0</td>

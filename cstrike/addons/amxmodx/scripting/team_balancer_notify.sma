@@ -28,14 +28,14 @@ public plugin_init()
   register_plugin(PLUGIN, VERSION, AUTHOR);
   register_dictionary(DICTIONARY);
 
-  g_pcvar_prefix                        = register_cvar("tb_notify_prefix", "^3[TB]^1 ");
-  g_pcvar_print_names_to_console        = register_cvar("tb_notify_print_names_to_console", "0");
-  g_pcvar_notify_checking               = register_cvar("tb_notify_checking_balance", "1");
-  g_pcvar_notify_balance_check_results  = register_cvar("tb_notify_balance_check_results", "1");
-  g_pcvar_notify_forced_balancing       = register_cvar("tb_notify_forced_balancing", "1");
-  g_pcvar_notify_transfers              = register_cvar("tb_notify_transfers", "1");
-  g_pcvar_notify_switches               = register_cvar("tb_notify_switches", "1");
-  g_pcvar_notify_balancing_failed       = register_cvar("tb_notify_balancing_failed", "1");
+  g_pcvar_prefix                        = register_cvar("tb_info_prefix", "^3[TB]^1 ");
+  g_pcvar_print_names_to_console        = register_cvar("tb_info_print_names_to_console", "0");
+  g_pcvar_notify_checking               = register_cvar("tb_info_checking_balance", "1");
+  g_pcvar_notify_balance_check_results  = register_cvar("tb_info_balance_check_results", "1");
+  g_pcvar_notify_forced_balancing       = register_cvar("tb_info_forced_balancing", "1");
+  g_pcvar_notify_transfers              = register_cvar("tb_info_transfers", "1");
+  g_pcvar_notify_switches               = register_cvar("tb_info_switches", "1");
+  g_pcvar_notify_balancing_failed       = register_cvar("tb_info_balancing_failed", "1");
 }
 
 public plugin_cfg()
