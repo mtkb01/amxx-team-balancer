@@ -33,9 +33,20 @@ public plugin_init()
 {
   register_plugin(PLUGIN, VERSION, AUTHOR);
 
+  /* CVars */
+
   g_pcvar_recheck_skill_diff_delay = register_cvar("tb_skill_recheck_diff_delay", "1.5");
 
+  register_cvar("tb_skill_diff_threshold", "100.0");
+  register_cvar("tb_min_desired_skill_diff", "200.0");
+  register_cvar("tb_min_skill_diff_global_delta", "60.0");
+  register_cvar("tb_min_skill_diff_local_delta", "30.0");
+
+  /* Forwards */
+
   g_fw_skill_diff_changed = CreateMultiForward("tb_skill_diff_changed", ET_IGNORE);
+
+  /* Events */
 
   register_logevent("event_jointeam", 3, "1=joined team");
 }

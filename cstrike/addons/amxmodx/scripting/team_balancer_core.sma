@@ -62,19 +62,19 @@ public plugin_init()
 {
   register_plugin(PLUGIN, VERSION, AUTHOR);
 
+  /* CVars */
+
   g_pcvar_balancing_strategy        = register_cvar("tb_balancing_strategy", "2");
-  g_pcvar_skill_threshold           = register_cvar("tb_skill_diff_threshold", "100.0");
-  g_pcvar_min_desired_skill         = register_cvar("tb_min_desired_skill_diff", "200.0");
-  g_pcvar_min_diff_global_delta     = register_cvar("tb_min_skill_diff_global_delta", "60.0");
-  g_pcvar_min_diff_local_delta      = register_cvar("tb_min_skill_diff_local_delta", "30.0");
-  g_pcvar_player_count_threshold    = register_cvar("tb_player_count_threshold", "3");
-  g_pcvar_max_transfers_per_team    = register_cvar("tb_max_transfers_per_team", "2");
-  g_pcvar_delay_before_start        = register_cvar("tb_delay_before_start", "60.0");
   g_pcvar_balance_check_trigger     = register_cvar("tb_balance_check_trigger", "3");
   g_pcvar_rounds_between_balancing  = register_cvar("tb_rounds_between_balancing", "2");
+  g_pcvar_forced_balancing_interval = register_cvar("tb_forced_balancing_interval", "2");
+  g_pcvar_player_count_threshold    = register_cvar("tb_player_count_threshold", "3");
+  g_pcvar_max_transfers_per_team    = register_cvar("tb_max_transfers_per_team", "2");
   g_pcvar_immunity_type             = register_cvar("tb_immunity_type", "2");
   g_pcvar_immunity_amount           = register_cvar("tb_immunity_amount", "1");
-  g_pcvar_forced_balancing_interval = register_cvar("tb_forced_balancing_interval", "2");
+  g_pcvar_delay_before_start        = register_cvar("tb_delay_before_start", "60.0");
+
+  /* Forwards */
 
   g_fw_checking_balance     = CreateMultiForward("tb_checking_balance", ET_IGNORE);
   g_fw_balance_checked      = CreateMultiForward("tb_balance_checked", ET_IGNORE, FP_CELL);
@@ -84,6 +84,8 @@ public plugin_init()
   );
   g_fw_players_switched     = CreateMultiForward("tb_players_switched", ET_IGNORE, FP_CELL);
   g_fw_balancing_failed     = CreateMultiForward("tb_balancing_failed", ET_IGNORE);
+
+  /* Events */
 
   register_logevent("logevent_round_end", 2, "1=Round_End");
 
@@ -96,6 +98,14 @@ public plugin_init()
 #endif
 
   LOG("[TB:CORE::plugin_init] Loaded.");
+}
+
+public plugin_cfg()
+{
+  g_pcvar_skill_threshold       = get_cvar_pointer("tb_skill_diff_threshold");
+  g_pcvar_min_desired_skill     = get_cvar_pointer("tb_min_desired_skill_diff");
+  g_pcvar_min_diff_global_delta = get_cvar_pointer("tb_min_skill_diff_global_delta");
+  g_pcvar_min_diff_local_delta  = get_cvar_pointer("tb_min_skill_diff_local_delta");
 }
 
 public plugin_natives()

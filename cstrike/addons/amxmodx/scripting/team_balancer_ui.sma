@@ -55,17 +55,25 @@ public plugin_init()
 {
   register_plugin(PLUGIN, VERSION, AUTHOR);
 
+  /* CVars */
+
   g_pcvar_skill_menu_flag       = register_cvar("tb_ui_skill_menu_flag", "");
   g_pcvar_player_skill_flag     = register_cvar("tb_ui_player_skill_flag", "");
   g_pcvar_player_info_flag      = register_cvar("tb_ui_player_info_flag", "l");
   g_pcvar_allow_force_balancing = register_cvar("tb_ui_allow_force_balancing", "1");
   g_pcvar_force_balance_flag    = register_cvar("tb_ui_force_balance_flag", "l");
 
+  /* Client commands */
+
   register_clcmd("say", "clcmd_say");
   register_clcmd("say_team", "clcmd_say");
   register_clcmd("_name_filter", "clcmd_name_filter");
 
+  /* Menus */
+
   register_menucmd(register_menuid("Player Skills Menu"), 1023, "handle_player_skills_menu");
+
+  /* Misc. */
 
   g_pids = ArrayCreate();
 }

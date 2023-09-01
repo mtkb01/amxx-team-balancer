@@ -31,7 +31,7 @@ _Note: the min. and max. values are not currently enforced, and are only provide
     <td align="center">Max. value</td>
     <td>Description</td>
   </tr>
-  <tr><td colspan="6" align="center">Core</td></tr>
+  <tr><td colspan="6" align="center">General</td></tr>
   <tr>
     <td><code>tb_balancing_strategy</code></td>
     <td align="center">integer</td>
@@ -163,7 +163,7 @@ _Note: the min. and max. values are not currently enforced, and are only provide
     <td align="center">-</td>
     <td>Amount of time (in seconds) to wait after the last team join event occurs before rechecking skill difference between teams.</td>
   </tr>
-  <tr><td colspan="6" align="center">Notify</td></tr>
+  <tr><td colspan="6" align="center">Information</td></tr>
   <tr>
     <td><code>tb_info_prefix</code></td>
     <td align="center">string</td>

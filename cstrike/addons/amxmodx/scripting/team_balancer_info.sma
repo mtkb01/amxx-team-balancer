@@ -14,12 +14,12 @@
 
 new g_pcvar_prefix;
 new g_pcvar_print_names_to_console;
-new g_pcvar_notify_checking;
-new g_pcvar_notify_balance_check_results;
-new g_pcvar_notify_forced_balancing;
-new g_pcvar_notify_transfers;
-new g_pcvar_notify_switches;
-new g_pcvar_notify_balancing_failed;
+new g_pcvar_info_checking;
+new g_pcvar_info_balance_check_results;
+new g_pcvar_info_forced_balancing;
+new g_pcvar_info_transfers;
+new g_pcvar_info_switches;
+new g_pcvar_info_balancing_failed;
 
 new g_prefix[MAX_PREFIX_LENGTH + 1];
 
@@ -28,14 +28,16 @@ public plugin_init()
   register_plugin(PLUGIN, VERSION, AUTHOR);
   register_dictionary(DICTIONARY);
 
-  g_pcvar_prefix                        = register_cvar("tb_info_prefix", "^3[TB]^1 ");
-  g_pcvar_print_names_to_console        = register_cvar("tb_info_print_names_to_console", "0");
-  g_pcvar_notify_checking               = register_cvar("tb_info_checking_balance", "1");
-  g_pcvar_notify_balance_check_results  = register_cvar("tb_info_balance_check_results", "1");
-  g_pcvar_notify_forced_balancing       = register_cvar("tb_info_forced_balancing", "1");
-  g_pcvar_notify_transfers              = register_cvar("tb_info_transfers", "1");
-  g_pcvar_notify_switches               = register_cvar("tb_info_switches", "1");
-  g_pcvar_notify_balancing_failed       = register_cvar("tb_info_balancing_failed", "1");
+  /* CVars */
+
+  g_pcvar_prefix                      = register_cvar("tb_info_prefix", "^3[TB]^1 ");
+  g_pcvar_print_names_to_console      = register_cvar("tb_info_print_names_to_console", "0");
+  g_pcvar_info_checking               = register_cvar("tb_info_checking_balance", "1");
+  g_pcvar_info_balance_check_results  = register_cvar("tb_info_balance_check_results", "1");
+  g_pcvar_info_forced_balancing       = register_cvar("tb_info_forced_balancing", "1");
+  g_pcvar_info_transfers              = register_cvar("tb_info_transfers", "1");
+  g_pcvar_info_switches               = register_cvar("tb_info_switches", "1");
+  g_pcvar_info_balancing_failed       = register_cvar("tb_info_balancing_failed", "1");
 }
 
 public plugin_cfg()
@@ -72,7 +74,7 @@ public native_get_prefix(plugin, argc)
 
 public tb_checking_balance()
 {
-  if (get_pcvar_bool(g_pcvar_notify_checking)) {
+  if (get_pcvar_bool(g_pcvar_info_checking)) {
     get_pcvar_string(g_pcvar_prefix, g_prefix, charsmax(g_prefix));
     client_print_color(
       0, print_team_default, "%s%L", g_prefix, LANG_PLAYER, "CHAT_CHECKING_BALANCE"
@@ -82,7 +84,7 @@ public tb_checking_balance()
 
 public tb_balance_checked(bool:needs_balancing)
 {
-  if (!get_pcvar_bool(g_pcvar_notify_balance_check_results)) {
+  if (!get_pcvar_bool(g_pcvar_info_balance_check_results)) {
     return;
   }
 
@@ -103,7 +105,7 @@ public tb_balance_checked(bool:needs_balancing)
 
 public tb_forced_balancing(pid)
 {
-  if (!get_pcvar_bool(g_pcvar_notify_forced_balancing)) {
+  if (!get_pcvar_bool(g_pcvar_info_forced_balancing)) {
     return;
   }
 
@@ -117,7 +119,7 @@ public tb_forced_balancing(pid)
 
 public tb_players_transferred(Array:pids, CsTeams:dst)
 {
-  if (!get_pcvar_bool(g_pcvar_notify_transfers)) {
+  if (!get_pcvar_bool(g_pcvar_info_transfers)) {
     return;
   }
 
@@ -168,7 +170,7 @@ public tb_players_transferred(Array:pids, CsTeams:dst)
 
 public tb_players_switched(Array:pids)
 {
-  if (!get_pcvar_bool(g_pcvar_notify_switches)) {
+  if (!get_pcvar_bool(g_pcvar_info_switches)) {
     return;
   }
 
@@ -215,7 +217,7 @@ public tb_players_switched(Array:pids)
 
 public tb_balancing_failed()
 {
-  if (get_pcvar_bool(g_pcvar_notify_balancing_failed)) {
+  if (get_pcvar_bool(g_pcvar_info_balancing_failed)) {
     get_pcvar_string(g_pcvar_prefix, g_prefix, charsmax(g_prefix));
     client_print_color(
       0, print_team_default, "%s%L", g_prefix, LANG_PLAYER, "CHAT_BALANCING_FAILED"
