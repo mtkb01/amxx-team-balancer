@@ -53,10 +53,6 @@ public plugin_natives()
   register_native("tb_get_prefix", "native_get_prefix");
 }
 
-public __may_never_be_called() {
-  client_print_color(0, 0, {0}, {0});
-}
-
 /* Natives */
 
 public native_get_prefix(plugin, argc)
