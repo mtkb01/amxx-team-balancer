@@ -40,11 +40,11 @@ new const g_clcmds[][][32 + 1] =
 new g_pcvar_delay_before_start;
 new g_pcvar_forced_balancing_interval;
 
-new g_pcvar_skill_menu_access_flag;
-new g_pcvar_player_skill_access_flag;
-new g_pcvar_player_info_access_flag;
+new g_pcvar_skill_menu_flag;
+new g_pcvar_player_skill_flag;
+new g_pcvar_player_info_flag;
 new g_pcvar_allow_force_balancing;
-new g_pcvar_force_balance_access_flag;
+new g_pcvar_force_balance_flag;
 
 new g_xid_rounds_since_last_balance_check;
 
@@ -55,11 +55,11 @@ public plugin_init()
 {
   register_plugin(PLUGIN, VERSION, AUTHOR);
 
-  g_pcvar_skill_menu_access_flag    = register_cvar("tb_ui_skill_menu_access_flag", "");
-  g_pcvar_player_skill_access_flag  = register_cvar("tb_ui_player_skill_access_flag", "");
-  g_pcvar_player_info_access_flag   = register_cvar("tb_ui_player_info_access_flag", "l");
-  g_pcvar_allow_force_balancing     = register_cvar("tb_ui_allow_force_balancing", "1");
-  g_pcvar_force_balance_access_flag = register_cvar("tb_ui_force_balance_access_flag", "l");
+  g_pcvar_skill_menu_flag       = register_cvar("tb_ui_skill_menu_flag", "");
+  g_pcvar_player_skill_flag     = register_cvar("tb_ui_player_skill_flag", "");
+  g_pcvar_player_info_flag      = register_cvar("tb_ui_player_info_flag", "l");
+  g_pcvar_allow_force_balancing = register_cvar("tb_ui_allow_force_balancing", "1");
+  g_pcvar_force_balance_flag    = register_cvar("tb_ui_force_balance_flag", "l");
 
   register_clcmd("say", "clcmd_say");
   register_clcmd("say_team", "clcmd_say");
@@ -157,7 +157,7 @@ public clcmd_name_filter(const pid)
 public handle_say_skill(const pid, const args[])
 {
   if (args[0] == '^0') {
-    if (!has_pcvar_flags(pid, g_pcvar_skill_menu_access_flag)) {
+    if (!has_pcvar_flags(pid, g_pcvar_skill_menu_flag)) {
       chat_print(pid, "%L", pid, "CHAT_NO_ACCESS");
       return;
     }
@@ -190,12 +190,12 @@ show_skill_menu(const pid)
 
   new bool:display_force_balancing_item =
     get_pcvar_bool(g_pcvar_allow_force_balancing)
-    && has_pcvar_flags(pid, g_pcvar_force_balance_access_flag);
+    && has_pcvar_flags(pid, g_pcvar_force_balance_flag);
 
   add_fmt_menu_item(menu, true, "%L", pid, "MENU_CT_SKILL", tb_get_team_skill(CS_TEAM_CT));
   add_fmt_menu_item(menu, true, "%L^n", pid, "MENU_T_SKILL", tb_get_team_skill(CS_TEAM_T));
   add_fmt_menu_item(
-    menu, !has_pcvar_flags(pid, g_pcvar_player_skill_access_flag),
+    menu, !has_pcvar_flags(pid, g_pcvar_player_skill_flag),
     "%L%s", pid, "MENU_PLAYER_SKILLS", display_force_balancing_item ? "^n" : ""
   );
 
@@ -319,7 +319,7 @@ show_player_skills_menu(const pid, page = 1)
   }
 
   /* Decide whether items should be disabled or not based on access flag. */
-  set_menu_state_by_cond(has_pcvar_flags(pid, g_pcvar_player_info_access_flag), colors);
+  set_menu_state_by_cond(has_pcvar_flags(pid, g_pcvar_player_info_flag), colors);
 
   /* Populate with players. */
   new team[MAX_TEAM_NAME_LENGTH + 1];

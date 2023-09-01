@@ -258,7 +258,7 @@ _Note: the min. and max. values are not currently enforced, and are only provide
   </tr>
   <tr><td colspan="6" align="center">Interface</td></tr>
   <tr>
-    <td><code>tb_ui_skill_menu_access_flag</code></td>
+    <td><code>tb_ui_skill_menu_flag</code></td>
     <td align="center">string</td>
     <td align="center"><code>""</code></td>
     <td align="center">-</td>
@@ -266,7 +266,7 @@ _Note: the min. and max. values are not currently enforced, and are only provide
     <td>Required flag to access <code>/skill</code> menu.</td>
   </tr>
   <tr>
-    <td><code>tb_ui_player_skill_access_flag</code></td>
+    <td><code>tb_ui_player_skill_flag</code></td>
     <td align="center">string</td>
     <td align="center"><code>"l"</code></td>
     <td align="center">-</td>
@@ -274,7 +274,7 @@ _Note: the min. and max. values are not currently enforced, and are only provide
     <td>Required flag to access list of players' skill ratings.</td>
   </tr>
   <tr>
-    <td><code>tb_ui_player_info_access_flag</code></td>
+    <td><code>tb_ui_player_info_flag</code></td>
     <td align="center">string</td>
     <td align="center"><code>"l"</code></td>
     <td align="center">-</td>
@@ -294,7 +294,7 @@ _Note: the min. and max. values are not currently enforced, and are only provide
     </td>
   </tr>
   <tr>
-    <td><code>tb_ui_force_balance_access_flag</code></td>
+    <td><code>tb_ui_force_balance_flag</code></td>
     <td align="center">string</td>
     <td align="center"><code>"l"</code></td>
     <td align="center">-</td>
