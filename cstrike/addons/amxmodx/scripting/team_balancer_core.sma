@@ -103,9 +103,9 @@ public plugin_init()
 public plugin_cfg()
 {
   g_pcvar_skill_threshold       = get_cvar_pointer("tb_skill_diff_threshold");
-  g_pcvar_min_desired_skill     = get_cvar_pointer("tb_min_desired_skill_diff");
-  g_pcvar_min_diff_global_delta = get_cvar_pointer("tb_min_skill_diff_global_delta");
-  g_pcvar_min_diff_local_delta  = get_cvar_pointer("tb_min_skill_diff_local_delta");
+  g_pcvar_min_desired_skill     = get_cvar_pointer("tb_skill_min_desired_diff");
+  g_pcvar_min_diff_global_delta = get_cvar_pointer("tb_skill_min_diff_global_delta");
+  g_pcvar_min_diff_local_delta  = get_cvar_pointer("tb_skill_min_diff_local_delta");
 }
 
 public plugin_natives()
