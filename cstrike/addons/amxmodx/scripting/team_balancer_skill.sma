@@ -51,11 +51,6 @@ public plugin_init()
   register_logevent("event_jointeam", 3, "1=joined team");
 }
 
-public plugin_end()
-{
-  log_to_file("addons/amxmodx/logs/others/tb_2023_08_08.log", "ENDINGADNAJDHKJLAHKJAHDKJAHDKJAHD");
-}
-
 public plugin_cfg()
 {
   if (is_plugin_loaded("Team Balancer: Core") == -1) {
