@@ -14,7 +14,7 @@
 #define DEBUG
 
 #define PLUGIN  "Team Balancer: Core"
-#define VERSION "0.1"
+#define VERSION "0.1.0"
 #define AUTHOR  "prnl0"
 
 #define XO_LINUX_DIFF 5

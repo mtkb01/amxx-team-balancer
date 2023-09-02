@@ -7,7 +7,7 @@
 #include <team_balancer_stocks>
 
 #define PLUGIN  "Team Balancer: Interface"
-#define VERSION "0.1"
+#define VERSION "0.1.0"
 #define AUTHOR  "prnl0"
 
 #define MAX_TEAM_NAME_LENGTH 4
