@@ -78,20 +78,24 @@ public plugin_init()
   g_pids = ArrayCreate();
 }
 
+public plugin_cfg()
+{
+  if (is_plugin_loaded("Team Balancer: Core") == -1) {
+    set_fail_state("^"Team Balancer: Core^" must be loaded.");
+  }
+
+  g_pcvar_delay_before_start        = get_cvar_pointer("tb_delay_before_start");
+  g_pcvar_forced_balancing_interval = get_cvar_pointer("tb_forced_balancing_interval");
+
+  g_xid_rounds_since_last_balance_check = get_xvar_id("g_rounds_since_last_balance_check");
+}
+
 public plugin_end()
 {
   for (new i = 0; i != ArraySize(g_pids); ++i) {
     ArrayDestroy(g_players[ArrayGetCell(g_pids, i)][player_menu_pids]);
   }
   ArrayDestroy(g_pids);
-}
-
-public plugin_cfg()
-{
-  g_pcvar_delay_before_start        = get_cvar_pointer("tb_delay_before_start");
-  g_pcvar_forced_balancing_interval = get_cvar_pointer("tb_forced_balancing_interval");
-
-  g_xid_rounds_since_last_balance_check = get_xvar_id("g_rounds_since_last_balance_check");
 }
 
 public client_putinserver(pid)
