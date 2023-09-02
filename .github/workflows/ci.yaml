@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "*.md"
+      - "LICENSE"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        amxx-version: ['1.9.x', '1.10.x']
+    steps:
+      - uses: actions/checkout@v2
+      - uses: wopox1337/setup-amxxpawn@v1
+        with:
+          version: ${{ matrix.amxx-version }}
+      - working-directory: cstrike/addons/amxmodx/scripting
+        run: |
+          for sma in *.sma; do
+            mkdir -p ../plugins
+            amxxpc $sma -i"include" -o"../plugins"
+          done
+      - run: |
+          mkdir publish
+          mv cstrike/ publish/
+      - uses: actions/upload-artifact@v2
+        with:
+          name: teambalancer-dev
+          path: publish/*
