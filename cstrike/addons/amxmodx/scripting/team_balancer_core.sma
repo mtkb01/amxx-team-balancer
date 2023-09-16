@@ -16,6 +16,8 @@
 
 #define TB_PLUGIN "Team Balancer: Core"
 
+#define TB_CONFIG "team_balancer.cfg"
+
 #define XO_LINUX_DIFF 5
 #define XO_TEAM 114
 
@@ -101,6 +103,11 @@ public plugin_init()
 
 public plugin_cfg()
 {
+  new configsdir[PLATFORM_MAX_PATH];
+  get_configsdir(configsdir, charsmax(configsdir));
+  server_cmd("exec %s/%s", configsdir, TB_CONFIG);
+  server_exec();
+
   g_pcvar_skill_threshold       = get_cvar_pointer("tb_skill_diff_threshold");
   g_pcvar_min_desired_skill     = get_cvar_pointer("tb_skill_min_desired_diff");
   g_pcvar_min_diff_global_delta = get_cvar_pointer("tb_skill_min_diff_global_delta");
