@@ -12,8 +12,8 @@ An [AMX Mod X](https://www.amxmodx.org/) plugin for [Counter-Strike 1.6](https:/
 
 1. Download the [latest release](https://github.com/prnl0/amxx-team-balancer/releases/latest).
 2. Extract the 7z archive into your HLDS folder.
-3. (Optional) Selectively enable/disable plugins by un-/commenting them in `plugins-team_balancer.ini`. (Note: `team_balancer_core.amxx` and `team_balancer_skill.amxx` must remain enabled.)
-4. (Optional) Configure plugins through CVars in `team_balancer.cfg`.
+3. _(Optional)_ Selectively enable/disable plugins by un-/commenting them in `plugins-team_balancer.ini`. (Note: `team_balancer_core.amxx` and `team_balancer_skill.amxx` must remain enabled.)
+4. _(Optional)_ Configure plugins through CVars in `team_balancer.cfg`.
 
 ## Configuration (CVars)
 
