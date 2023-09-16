@@ -180,10 +180,7 @@ public native_balance(plugin, argc)
     return;
   }
 
-  LOG( \
-    "[TB:CORE::native_balance] %d is forced a balancing at round end.", \
-    get_pcvar_num(g_pcvar_rounds_between_balancing) - g_rounds_since_last_balance_check \
-  );
+  LOG("[TB:CORE::native_balance] %d forced a balancing at round end.", pid);
 
   ExecuteForward(g_fw_forced_balancing, _, pid);
   g_needs_balance_check = true;
@@ -1012,41 +1009,35 @@ bool:is_player_immune(const pid)
 }
 
 #if defined DEBUG
-log_players(bool:before_balancing)
+log_team(str[], maxlen, const team[], CsTeams:team_id)
 {
-  new str[1536 + 1];
-  formatex(
-    str, charsmax(str), "[TB:CORE::log_players] Player list %s balancing:^n",
-    before_balancing ? "before" : "after"
-  );
-
   new players[MAX_PLAYERS];
   new playersnum = 0;
 
-  get_players_ex(players, playersnum, GetPlayers_MatchTeam, "CT");
+  get_players_ex(players, playersnum, GetPlayers_MatchTeam, team);
   formatex(
-    str, charsmax(str),
-    "%s  CTs (num: %d; skill: %.1f):^n", str, playersnum, tb_get_team_skill(CS_TEAM_CT)
+    str, maxlen,
+    "%s^n  %ss (num: %d; skill: %.1f):^n", str, team, playersnum, tb_get_team_skill(team_id)
   );
   new name[MAX_NAME_LENGTH + 1];
   for (new i = 0; i != playersnum; ++i) {
     get_user_name(players[i], name, charsmax(name));
     formatex(
-      str, charsmax(str), "%s    %d. %s: %.1f^n", str, i, name, tb_get_player_skill(players[i])
+      str, maxlen, "%s    %d. %s: %.1f^n", str, i, name, tb_get_player_skill(players[i])
     );
   }
+}
 
-  get_players_ex(players, playersnum, GetPlayers_MatchTeam, "TERRORIST");
+log_players(bool:before_balancing)
+{
+  new str[1536 + 1];
   formatex(
-    str, charsmax(str),
-    "%s^n  Ts (num: %d; skill: %.1f):", str, playersnum, tb_get_team_skill(CS_TEAM_T)
+    str, charsmax(str), "[TB:CORE::log_players] Player list %s balancing:",
+    before_balancing ? "before" : "after"
   );
-  for (new i = 0; i != playersnum; ++i) {
-    get_user_name(players[i], name, charsmax(name));
-    formatex(
-      str, charsmax(str), "%s^n    %d. %s: %.1f", str, i, name, tb_get_player_skill(players[i])
-    );
-  }
+
+  log_team(str, charsmax(str), "CT", CS_TEAM_CT);
+  log_team(str, charsmax(str), "TERRORIST", CS_TEAM_T);
 
   LOG(str);
 }
