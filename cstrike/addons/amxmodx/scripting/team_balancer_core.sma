@@ -18,7 +18,6 @@
 
 #define TB_CONFIG "team_balancer.cfg"
 
-#define XO_LINUX_DIFF 5
 #define XO_TEAM 114
 
 #if defined DEBUG
