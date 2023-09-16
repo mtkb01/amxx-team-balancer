@@ -50,7 +50,7 @@ jobs:
         working-directory: cstrike/addons/amxmodx/scripting
         run: |
           for sma in *.sma; do
-            sed -i 's/,.VERSION/, VERSION+"-${{needs.version.outputs.dev}}"/g' $sma
+            sed -i 's/,.TB_VERSION/, TB_VERSION+"-${{needs.version.outputs.dev}}"/g' $sma
           done
 
       - name: Compile plugins
