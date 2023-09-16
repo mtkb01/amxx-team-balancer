@@ -8,7 +8,7 @@
   #pragma loadlib team_balancer_core
 #endif
 
-#define TB_VERSION  "0.1.0"
+#define TB_VERSION  "0.1.0-beta"
 #define TB_AUTHOR   "prnl0"
 
 /*
