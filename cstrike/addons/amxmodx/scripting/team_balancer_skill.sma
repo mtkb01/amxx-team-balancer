@@ -1,9 +1,9 @@
 #include <amxmodx>
 #include <amxmisc>
 
-#define PLUGIN  "Team Balancer: Skill"
-#define VERSION "0.1.0"
-#define AUTHOR  "prnl0"
+#include <team_balancer>
+
+#define TB_PLUGIN "Team Balancer: Skill"
 
 enum (+= 1000)
 {
@@ -31,7 +31,7 @@ new g_fw_skill_diff_changed;
 
 public plugin_init()
 {
-  register_plugin(PLUGIN, VERSION, AUTHOR);
+  register_plugin(TB_PLUGIN, TB_VERSION, TB_AUTHOR);
 
   /* CVars */
 

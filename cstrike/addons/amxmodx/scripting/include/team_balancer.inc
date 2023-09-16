@@ -8,6 +8,9 @@
   #pragma loadlib team_balancer_core
 #endif
 
+#define TB_VERSION  "0.1.0"
+#define TB_AUTHOR   "prnl0"
+
 /*
  * Tries to force a balancing attempt at the end of the current round.
  *

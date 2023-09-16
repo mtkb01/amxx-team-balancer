@@ -7,15 +7,14 @@
 #include <fakemeta>
 #include <cellarray>
 
+#include <team_balancer>
 #include <team_balancer_skill>
 #include <team_balancer_stocks>
 #include <team_balancer_const>
 
 #define DEBUG
 
-#define PLUGIN  "Team Balancer: Core"
-#define VERSION "0.1.0"
-#define AUTHOR  "prnl0"
+#define TB_PLUGIN "Team Balancer: Core"
 
 #define XO_LINUX_DIFF 5
 #define XO_TEAM 114
@@ -60,7 +59,7 @@ new g_balancings_invoked[MAX_PLAYERS + 1];
 
 public plugin_init()
 {
-  register_plugin(PLUGIN, VERSION, AUTHOR);
+  register_plugin(TB_PLUGIN, TB_VERSION, TB_AUTHOR);
 
   /* CVars */
 

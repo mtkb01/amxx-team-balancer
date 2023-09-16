@@ -6,9 +6,7 @@
 #include <team_balancer_skill>
 #include <team_balancer_stocks>
 
-#define PLUGIN  "Team Balancer: Interface"
-#define VERSION "0.1.0"
-#define AUTHOR  "prnl0"
+#define TB_PLUGIN "Team Balancer: Interface"
 
 #define MAX_TEAM_NAME_LENGTH 4
 
@@ -53,7 +51,7 @@ new Array:g_pids;
 
 public plugin_init()
 {
-  register_plugin(PLUGIN, VERSION, AUTHOR);
+  register_plugin(TB_PLUGIN, TB_VERSION, TB_AUTHOR);
 
   /* CVars */
 

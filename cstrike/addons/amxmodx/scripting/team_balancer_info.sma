@@ -6,9 +6,7 @@
 #include <team_balancer_stocks>
 #include <team_balancer_const>
 
-#define PLUGIN  "Team Balancer: Notify"
-#define VERSION "0.1.0"
-#define AUTHOR  "prnl0"
+#define TB_PLUGIN "Team Balancer: Notify"
 
 #define DICTIONARY "team_balancer.txt"
 
@@ -25,7 +23,7 @@ new g_prefix[MAX_PREFIX_LENGTH + 1];
 
 public plugin_init()
 {
-  register_plugin(PLUGIN, VERSION, AUTHOR);
+  register_plugin(TB_PLUGIN, TB_VERSION, TB_AUTHOR);
   register_dictionary(DICTIONARY);
 
   /* CVars */
