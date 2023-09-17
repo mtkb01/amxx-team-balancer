@@ -1,28 +1,27 @@
 #include <amxmodx>
 #include <amxmisc>
 
+#include <gunxpmod>
 #include <team_balancer>
 
 #define TB_PLUGIN "Team Balancer: Skill"
 
 enum (+= 1000)
 {
-  task_compute_skill = 2749,
   task_check_skill_diff = 6418
 };
 
-enum _:e_player
+enum _:PlayerData
 {
-  bool:player_connected,
-  /* TODO: remove once natives to query player info. become available. */
-  player_kills,
-  player_deaths,
-  player_hs,
-  player_used_prs,
-  player_bought_prs,
+  bool:pd_connected,
+  pd_kills,
+  pd_deaths,
+  pd_hs,
+  pd_used_prs,
+  pd_bought_prs,
 }
 
-new g_players[MAX_PLAYERS + 1][e_player];
+new g_player_data[MAX_PLAYERS + 1][PlayerData];
 new Float:g_skill[MAX_PLAYERS + 1];
 
 new g_pcvar_recheck_skill_diff_delay;
@@ -61,45 +60,37 @@ public plugin_cfg()
 public plugin_natives()
 {
   register_library("team_balancer_skill");
+  register_native("tb_get_player_data", "native_get_player_data");
   register_native("tb_get_player_skill", "native_get_player_skill");
   register_native("tb_get_team_skill", "native_get_team_skill");
   register_native("tb_get_team_skills", "native_get_team_skills");
   register_native("tb_get_player_skill_diff", "native_get_player_skill_diff");
   register_native("tb_get_team_skill_diff", "native_get_team_skill_diff");
   register_native("tb_get_stronger_team", "native_get_stronger_team");
-
-  /* TODO: remove once natives to query player info. become available. */
-  register_native("tb_get_player_data", "native_get_player_data");
 }
 
 public client_putinserver(pid)
 {
-  g_players[pid][player_connected]  = true;
-
-  /* TODO: remove once natives to query player info. become available. */
-  g_players[pid][player_kills]      = random_num(100, 6000);
-  g_players[pid][player_deaths]     = random_num(100, 4000);
-  g_players[pid][player_hs]         = random_num(50, g_players[pid][player_kills]);
-  g_players[pid][player_used_prs]   = random_num(1, 200);
-  g_players[pid][player_bought_prs] = random_num(1, g_players[pid][player_used_prs]);
-
-  set_task_ex(0.5, "compute_skill", task_compute_skill + pid);
+  g_player_data[pid][pd_connected]  = true;
 }
 
 public client_disconnected(pid, bool:drop, message[], maxlen)
 {
-  if (g_players[pid][player_connected]) {
-    g_players[pid][player_connected] = false;
+  if (g_player_data[pid][pd_connected]) {
+    g_player_data[pid][pd_connected] = false;
     ExecuteForward(g_fw_skill_diff_changed);
   }
 }
 
 /* Natives */
 
-/* TODO: remove once natives to query player info. become available. */
 public native_get_player_data(plugin, argc)
 {
-  return g_players[get_param(1)][get_param(2)];
+  enum {
+    param_pid = 1,
+    param_datum = 2
+  };
+  return g_player_data[get_param(param_pid)][get_param(param_datum)];
 }
 
 public Float:native_get_player_skill(plugin, argc)
@@ -148,7 +139,7 @@ public CsTeams:native_get_stronger_team(plugin, argc)
   return get_stronger_team();
 }
 
-/* Hooks */
+/* Hooks/Forwards */
 
 public event_jointeam()
 {
@@ -158,21 +149,28 @@ public event_jointeam()
   );
 }
 
-/* General */
-
-public compute_skill(tid)
+public gxp_data_loaded(pid, authid[])
 {
-  new pid = tid - task_compute_skill;
   if (!is_user_connected(pid)) {
     return;
   }
+
+  g_player_data[pid][pd_kills]      = gxp_get_user_kills(pid);
+  g_player_data[pid][pd_deaths]     = gxp_get_user_deaths(pid);
+  g_player_data[pid][pd_hs]         = gxp_get_user_hs(pid);
+  g_player_data[pid][pd_used_prs]   = get_user_used_prestige(pid);
+  g_player_data[pid][pd_bought_prs] = gxp_get_user_bought_prs(pid);
+
+  if (g_player_data[pid][pd_kills] == 0 || g_player_data[pid][pd_deaths] == 0) {
+    g_skill[pid] = 0.0;
+    return;
+  }
   
-  /* TODO: change once natives to query player info. become available. */
   g_skill[pid] =
-    0.4*(g_players[pid][player_kills]/g_players[pid][player_deaths])*100 +
-    0.1*(g_players[pid][player_hs]/g_players[pid][player_kills])*100 +
-    0.4*g_players[pid][player_used_prs] +
-    0.1*(g_players[pid][player_used_prs] - g_players[pid][player_bought_prs]);
+    0.4*(g_player_data[pid][pd_kills]/g_player_data[pid][pd_deaths])*100 +
+    0.1*(g_player_data[pid][pd_hs]/g_player_data[pid][pd_kills])*100 +
+    0.4*g_player_data[pid][pd_used_prs] +
+    0.1*(g_player_data[pid][pd_used_prs] - g_player_data[pid][pd_bought_prs]);
 }
 
 /* Utilities */

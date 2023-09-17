@@ -60,7 +60,7 @@ public native_get_prefix(plugin, argc)
     param_maxlen
   };
   new prefix[MAX_PREFIX_LENGTH + 1];
-  get_pcvar_string(g_pcvar_prefix, prefix, charsmax(prefix));
+  get_prefix(prefix, charsmax(prefix));
   set_string(param_prefix, prefix, get_param(param_maxlen));
 }
 
@@ -69,7 +69,7 @@ public native_get_prefix(plugin, argc)
 public tb_checking_balance()
 {
   if (get_pcvar_bool(g_pcvar_info_checking)) {
-    get_pcvar_string(g_pcvar_prefix, g_prefix, charsmax(g_prefix));
+    get_prefix(g_prefix, charsmax(g_prefix));
     client_print_color(
       0, print_team_default, "%s%L", g_prefix, LANG_PLAYER, "CHAT_CHECKING_BALANCE"
     );
@@ -82,7 +82,7 @@ public tb_balance_checked(bool:needs_balancing)
     return;
   }
 
-  get_pcvar_string(g_pcvar_prefix, g_prefix, charsmax(g_prefix));
+  get_prefix(g_prefix, charsmax(g_prefix));
 
   if (needs_balancing) {
     client_print_color(
@@ -105,7 +105,7 @@ public tb_forced_balancing(pid)
 
   new name[MAX_NAME_LENGTH + 1];
   get_user_name(pid, name, charsmax(name));
-  get_pcvar_string(g_pcvar_prefix, g_prefix, charsmax(g_prefix));
+  get_prefix(g_prefix, charsmax(g_prefix));
   client_print_color(
     0, print_team_default, "%s%L", g_prefix, LANG_PLAYER, "CHAT_FORCED_BALANCING", name
   );
@@ -117,7 +117,7 @@ public tb_players_transferred(Array:pids, CsTeams:dst)
     return;
   }
 
-  get_pcvar_string(g_pcvar_prefix, g_prefix, charsmax(g_prefix));
+  get_prefix(g_prefix, charsmax(g_prefix));
 
   if (ArraySize(pids) <= 2) {
     new names[2][MAX_NAME_LENGTH + 1];
@@ -168,7 +168,7 @@ public tb_players_switched(Array:pids)
     return;
   }
 
-  get_pcvar_string(g_pcvar_prefix, g_prefix, charsmax(g_prefix));
+  get_prefix(g_prefix, charsmax(g_prefix));
 
   if (ArraySize(pids) == 1) {
     new names[2][MAX_NAME_LENGTH + 1];
@@ -212,9 +212,17 @@ public tb_players_switched(Array:pids)
 public tb_balancing_failed()
 {
   if (get_pcvar_bool(g_pcvar_info_balancing_failed)) {
-    get_pcvar_string(g_pcvar_prefix, g_prefix, charsmax(g_prefix));
+    get_prefix(g_prefix, charsmax(g_prefix));
     client_print_color(
       0, print_team_default, "%s%L", g_prefix, LANG_PLAYER, "CHAT_BALANCING_FAILED"
     );
   }
+}
+
+/* Utilities */
+
+get_prefix(str[], maxlen)
+{
+  get_pcvar_string(g_pcvar_prefix, str, maxlen);
+  fix_colors(str, maxlen);
 }

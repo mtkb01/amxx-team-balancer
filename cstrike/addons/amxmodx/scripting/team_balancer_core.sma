@@ -6,6 +6,7 @@
 #include <amxmisc>
 #include <fakemeta>
 #include <cellarray>
+#include <cstrike> // remove
 
 #include <team_balancer>
 #include <team_balancer_skill>
@@ -105,6 +106,7 @@ public plugin_cfg()
   new configsdir[PLATFORM_MAX_PATH];
   get_configsdir(configsdir, charsmax(configsdir));
   server_cmd("exec %s/%s", configsdir, TB_CONFIG);
+  server_cmd("mp_autoteambalance 0");
   server_exec();
 
   g_pcvar_skill_threshold       = get_cvar_pointer("tb_skill_diff_threshold");
@@ -920,7 +922,7 @@ transfer_players(&Array:pids, bool:inform = true)
         "[TB:CORE::transfer_players] Transferring %d (%.1f) to %d.", \
         pid, tb_get_player_skill(pid), dst \
       );
-      set_pdata_int(pid, XO_TEAM, _:dst);
+      cs_set_user_team(pid, dst, CS_NORESET, false);
       /* Set to -1 here because `increase_immunity_amt` is invoked immediately
        * after balancing, thus resulting in an increment of these
        * state-tracking-params. */
@@ -952,13 +954,13 @@ switch_players(&Array:pairs, bool:inform = true)
   for (new i = 0; i != ArraySize(pairs); ++i) {
     new pids[2];
     ArrayGetArray(pairs, i, pids);
-    new team1 = get_user_team(pids[0]);
     LOG( \
       "[TB:CORE::switch_players] Switching %d (%.1f) with %d (%.1f).", \
       pids[0], tb_get_player_skill(pids[0]), pids[1], tb_get_player_skill(pids[1]) \
     );
-    set_pdata_int(pids[0], XO_TEAM, get_user_team(pids[1]));
-    set_pdata_int(pids[1], XO_TEAM, team1);
+    new team1 = get_user_team(pids[0]);
+    cs_set_user_team(pids[0], CsTeams:get_user_team(pids[1]), CS_NORESET, false);
+    cs_set_user_team(pids[1], CsTeams:team1, CS_NORESET, false);
     /* Set to -1 here because `increase_immunity_amt` is invoked immediately
      * after balancing, thus resulting in an increment of these
      * state-tracking-params. */

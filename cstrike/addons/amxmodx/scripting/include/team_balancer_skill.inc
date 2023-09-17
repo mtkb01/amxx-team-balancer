@@ -8,8 +8,17 @@
   #pragma loadlib team_balancer_skill
 #endif
 
-/* TODO: remove once natives to query player info. become available. */
-native tb_get_player_data(const pid, const item);
+#include <team_balancer_const>
+
+/*
+ * Retrieves a players' individual skill component.
+ *
+ * @param pid               Player ID to retrieve skill component of.
+ * @param component         Skill component to retrieve.
+ *
+ * @return                  Skill component of player identified by `pid`.
+ */
+native tb_get_player_skill_comp(const pid, const SkillComponent:component);
 
 /*
  * Retrieves a players' skill rating.

@@ -76,8 +76,37 @@ stock ellipsize(str[], maxlen)
     return;
   }
 
-  copy(str, maxlen, str);
+  new len = strlen(str);
   str[maxlen - 6] = '.';
   str[maxlen - 5] = '.';
   str[maxlen - 4] = '.';
+  str[maxlen - 3] = str[len - 3];
+  str[maxlen - 2] = str[len - 2];
+  str[maxlen - 1] = str[len - 1];
+  str[maxlen - 0] = str[len - 0];
+  copy(str, maxlen, str);
+}
+
+/*
+ * Replaces instances of `^1`, `^2`, `^3`, and `^4` with corresponding bytes.
+ * Necessary when AMX Mod X fails to interpret these strings for us. (Note:
+ * doesn't seem to be an issue on AMXX v1.10.x, though further testing is
+ * needed.)
+ *
+ * @param str         String to be fixed.
+ * @param maxlen      Maximum length of string buffer.
+ *
+ * @noreturn
+ */
+stock fix_colors(str[], maxlen)
+{
+  new color[3] = { '^^', '1', '^0' };
+  new fixed[2] = { 0x1, '^0' };
+#define TB_COLOR_DEFAULT  0x1
+#define TB_COLOR_GREEN    0x4
+  for (new i = TB_COLOR_DEFAULT; i <= TB_COLOR_GREEN; ++i) {
+    color[1] = '0' + i;
+    fixed[0] = i;
+    replace_string(str, maxlen, color, fixed);
+  }
 }

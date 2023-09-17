@@ -5,6 +5,7 @@
 #include <team_balancer>
 #include <team_balancer_skill>
 #include <team_balancer_stocks>
+#include <team_balancer_const>
 
 #define TB_PLUGIN "Team Balancer: Interface"
 
@@ -447,24 +448,33 @@ show_player_info_menu(const pid, const pid_info)
   formatex(str, charsmax(str), "%L", pid, "MENU_PLAYER_INFO_TITLE", name);
   new menu = menu_create(str, "handle_player_info_menu");
 
-  add_fmt_menu_item(menu, true, "%L: \r%d", pid, "MENU_KILLS", tb_get_player_data(pid_info, 1));
-  add_fmt_menu_item(menu, true, "%L: \r%d", pid, "MENU_DEATHS", tb_get_player_data(pid_info, 2));
-  add_fmt_menu_item(menu, true, "%L: \r%d", pid, "MENU_HS", tb_get_player_data(pid_info, 3));
-  add_fmt_menu_item(menu, true, "%L: \r%d", pid, "MENU_PRS", tb_get_player_data(pid_info, 4));
-  add_fmt_menu_item(
-    menu, true, "%L: \r%d^n", pid, "MENU_BOUGHT_PRS", tb_get_player_data(pid_info, 5)
-  );
+  new comps[SkillComponent];
+  comps[sc_kills] = tb_get_player_skill_comp(pid_info, sc_kills);
+  comps[sc_deaths] = tb_get_player_skill_comp(pid_info, sc_deaths);
+  comps[sc_hs] = tb_get_player_skill_comp(pid_info, sc_hs);
+  comps[sc_used_prs] = tb_get_player_skill_comp(pid_info, sc_used_prs);
+  comps[sc_bought_prs] = tb_get_player_skill_comp(pid_info, sc_bought_prs);
 
-  formatex(
-    str, charsmax(str),
-    "%L: \r%.1f + %.1f + %.1f + %.1f \d= \r%.1f",
-    pid, "MENU_SKILL",
-    0.4*tb_get_player_data(pid_info, 1)/tb_get_player_data(pid_info, 2)*100,
-    0.1*tb_get_player_data(pid_info, 3)/tb_get_player_data(pid_info, 1)*100,
-    0.4*tb_get_player_data(pid_info, 4),
-    0.1*(tb_get_player_data(pid_info, 4) - tb_get_player_data(pid_info, 5)),
-    tb_get_player_skill(pid_info)
-  );
+  add_fmt_menu_item(menu, true, "%L: \r%d", pid, "MENU_KILLS", comps[sc_kills]);
+  add_fmt_menu_item(menu, true, "%L: \r%d", pid, "MENU_DEATHS", comps[sc_deaths]);
+  add_fmt_menu_item(menu, true, "%L: \r%d", pid, "MENU_HS", comps[sc_hs]);
+  add_fmt_menu_item(menu, true, "%L: \r%d", pid, "MENU_PRS", comps[sc_used_prs]);
+  add_fmt_menu_item(menu, true, "%L: \r%d^n", pid, "MENU_BOUGHT_PRS", comps[sc_bought_prs]);
+
+  if (comps[sc_kills] == 0 || comps[sc_deaths] == 0) {
+    formatex(str, charsmax(str), "%L: \r0.0", pid, "MENU_SKILL");
+  } else {
+    formatex(
+      str, charsmax(str),
+      "%L: \r%.1f + %.1f + %.1f + %.1f \d= \r%.1f",
+      pid, "MENU_SKILL",
+      0.4*comps[sc_kills]/comps[sc_deaths]*100,
+      0.1*comps[sc_hs]/comps[sc_kills]*100,
+      0.4*comps[sc_used_prs],
+      0.1*(comps[sc_used_prs] - comps[sc_bought_prs]),
+      tb_get_player_skill(pid_info)
+    );
+  }
   add_fmt_menu_item(menu, true, str);
 
   formatex(str, charsmax(str), "%L", pid, "MENU_RETURN");

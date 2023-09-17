@@ -127,3 +127,17 @@ enum ImmunityType
  * Maximum length of name when two are to-be-formatted on one chat line.
  */
 #define MAX_FMT_NAME_LENGTH 21
+
+/* TB:SKILL */
+
+/*
+ * Skill components.
+ */
+enum SkillComponent
+{
+  sc_kills = 1,
+  sc_deaths,
+  sc_hs,
+  sc_used_prs,
+  sc_bought_prs
+}
