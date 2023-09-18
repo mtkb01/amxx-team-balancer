@@ -1,12 +1,13 @@
 /* TODO:
  *   - consider keeping track of players manually, instead of calling
- *     `get_playersnum_ex` each time. */
+ *     `get_playersnum_ex` each time;
+ *   - add time-based balance checks (i.e., every `n` seconds). */
 
 #include <amxmodx>
 #include <amxmisc>
 #include <fakemeta>
 #include <cellarray>
-#include <cstrike> // remove
+#include <cstrike> // figure out how to avoid this (included for `cs_set_user_team`)
 
 #include <team_balancer>
 #include <team_balancer_skill>
@@ -161,8 +162,9 @@ public native_balance(plugin, argc)
   if (pid == 0) {
     if (needs_balancing()) {
       ExecuteForward(g_fw_balance_checked, _, true);
-      balance();
-      server_cmd("sv_restartround 1");
+      if (balance()) {
+        server_cmd("sv_restartround 1");
+      }
     } else {
       ExecuteForward(g_fw_balance_checked, _, false);
     }
@@ -312,14 +314,14 @@ bool:needs_balancing(bool:suppress_fw = false)
   return false;
 }
 
-balance(bool:inform = true)
+bool:balance(bool:inform = true)
 {
   /* TODO: consider merging the methods somehow. */
 
   handle_player_count_diff();
   if (!needs_balancing(true)) {
     LOG("[TB:CORE::balance] Player count diff. reduced. Balancing no longer necessary. Leaving.");
-    return;
+    return false;
   }
 
   new BalancingStrategy:strat = BalancingStrategy:get_pcvar_num(g_pcvar_balancing_strategy);
@@ -352,7 +354,7 @@ balance(bool:inform = true)
         "[TB:CORE::balance] New skill diff. (%.1f) is either greater than the previous skill diff. \
         (%1.f), or the skill diff. delta doesn't satisfy `tb_min_skill_diff_global_delta` (needed: \
         %.1f; found: %.1f). Skipping.", \
-        diff, final_diff, get_pcvar_float(g_pcvar_min_diff_global_delta), final_diff - diff \
+        diff, final_diff, get_pcvar_float(g_pcvar_min_diff_global_delta), floatabs(final_diff - diff) \
       );
       ArrayDestroy(pids);
       continue;
@@ -381,7 +383,7 @@ balance(bool:inform = true)
     LOG("[TB:CORE::balance] Balancing failed.");
     ExecuteForward(g_fw_balancing_failed);
     ArrayDestroy(final_pids);
-    return;
+    return false;
   }
 
   if (final_transfer_type == tt_switch) {
@@ -400,6 +402,8 @@ balance(bool:inform = true)
    * here. Hoping that balancing handles them automatically. */
 
   increase_immunity_amt(.for_round_based_immunity = false);
+
+  return true;
 }
 
 handle_player_count_diff()

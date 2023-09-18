@@ -13,7 +13,7 @@
 
 #define MAX_MENU_SKILLS_ITEMS_PER_PAGE 5
 
-enum e_menu
+enum Menu
 {
   menu_none,
   menu_skill,
@@ -21,9 +21,10 @@ enum e_menu
   menu_player_info
 }
 
+/* TODO: normalize `enum` style (capitalize): `PlayerData`. */
 enum _:e_player
 {
-  e_menu:player_menu_id,
+  Menu:player_menu_id,
   player_menu_page,
   player_menu_filter[MAX_NAME_LENGTH + 1],
   SortMethod:player_menu_sort_method,
@@ -41,7 +42,9 @@ new g_pcvar_forced_balancing_interval;
 
 new g_pcvar_skill_menu_flag;
 new g_pcvar_player_skill_flag;
+#if !defined TB_BHVR_EXTERNAL_SKILL_COMPUTATION
 new g_pcvar_player_info_flag;
+#endif // TB_BHVR_EXTERNAL_SKILL_COMPUTATION
 new g_pcvar_allow_force_balancing;
 new g_pcvar_force_balance_flag;
 
@@ -58,7 +61,9 @@ public plugin_init()
 
   g_pcvar_skill_menu_flag       = register_cvar("tb_ui_skill_menu_flag", "");
   g_pcvar_player_skill_flag     = register_cvar("tb_ui_player_skill_flag", "");
+#if !defined TB_BHVR_EXTERNAL_SKILL_COMPUTATION
   g_pcvar_player_info_flag      = register_cvar("tb_ui_player_info_flag", "l");
+#endif // TB_BHVR_EXTERNAL_SKILL_COMPUTATION
   g_pcvar_allow_force_balancing = register_cvar("tb_ui_allow_force_balancing", "1");
   g_pcvar_force_balance_flag    = register_cvar("tb_ui_force_balance_flag", "l");
 
@@ -314,6 +319,8 @@ show_player_skills_menu(const pid, page = 1)
   new colors[2][2 + 1];
   colors[0][0] = '\';
   colors[1][0] = '\';
+  colors[0][1] = 'd';
+  colors[1][1] = 'd';
   colors[0][2] = '^0';
   colors[1][2] = '^0';
 
@@ -329,14 +336,20 @@ show_player_skills_menu(const pid, page = 1)
     );
   }
 
+#if !defined TB_BHVR_EXTERNAL_SKILL_COMPUTATION
   /* Decide whether items should be disabled or not based on access flag. */
   set_menu_state_by_cond(has_pcvar_flags(pid, g_pcvar_player_info_flag), colors);
+#endif // TB_BHVR_EXTERNAL_SKILL_COMPUTATION
 
   /* Populate with players. */
   new team[MAX_TEAM_NAME_LENGTH + 1];
   new const mipp = MAX_MENU_SKILLS_ITEMS_PER_PAGE;
   for (new i = 1, j = mipp*(page - 1), n = pnum > mipp*page ? mipp*page : pnum; j != n; ++j, ++i) {
-    keys |= (1 << (i - 1));
+#if !defined TB_BHVR_EXTERNAL_SKILL_COMPUTATION
+    if (has_pcvar_flags(pid, g_pcvar_player_info_flag)) {
+      keys |= (1 << (i - 1));
+    }
+#endif // TB_BHVR_EXTERNAL_SKILL_COMPUTATION
 
     new item_pid = ArrayGetCell(g_players[pid][player_menu_pids], j);
 
@@ -422,6 +435,7 @@ public handle_player_skills_menu(pid, item)
       show_skill_menu(pid);
     }
     default: {
+#if !defined TB_BHVR_EXTERNAL_SKILL_COMPUTATION
       show_player_info_menu(
         pid,
         ArrayGetCell(
@@ -429,12 +443,14 @@ public handle_player_skills_menu(pid, item)
           MAX_MENU_SKILLS_ITEMS_PER_PAGE*(g_players[pid][player_menu_page] - 1) + item
         )
       );
+#endif // TB_BHVR_EXTERNAL_SKILL_COMPUTATION
     }
   }
 
   return PLUGIN_HANDLED;
 }
 
+#if !defined TB_BHVR_EXTERNAL_SKILL_COMPUTATION
 show_player_info_menu(const pid, const pid_info)
 {
   g_players[pid][player_menu_id] = menu_player_info;
@@ -452,26 +468,20 @@ show_player_info_menu(const pid, const pid_info)
   comps[sc_kills] = tb_get_player_skill_comp(pid_info, sc_kills);
   comps[sc_deaths] = tb_get_player_skill_comp(pid_info, sc_deaths);
   comps[sc_hs] = tb_get_player_skill_comp(pid_info, sc_hs);
-  comps[sc_used_prs] = tb_get_player_skill_comp(pid_info, sc_used_prs);
-  comps[sc_bought_prs] = tb_get_player_skill_comp(pid_info, sc_bought_prs);
 
   add_fmt_menu_item(menu, true, "%L: \r%d", pid, "MENU_KILLS", comps[sc_kills]);
   add_fmt_menu_item(menu, true, "%L: \r%d", pid, "MENU_DEATHS", comps[sc_deaths]);
   add_fmt_menu_item(menu, true, "%L: \r%d", pid, "MENU_HS", comps[sc_hs]);
-  add_fmt_menu_item(menu, true, "%L: \r%d", pid, "MENU_PRS", comps[sc_used_prs]);
-  add_fmt_menu_item(menu, true, "%L: \r%d^n", pid, "MENU_BOUGHT_PRS", comps[sc_bought_prs]);
 
   if (comps[sc_kills] == 0 || comps[sc_deaths] == 0) {
     formatex(str, charsmax(str), "%L: \r0.0", pid, "MENU_SKILL");
   } else {
     formatex(
       str, charsmax(str),
-      "%L: \r%.1f + %.1f + %.1f + %.1f \d= \r%.1f",
+      "%L: \r%.1f + %.1f \d= \r%.1f",
       pid, "MENU_SKILL",
-      0.4*comps[sc_kills]/comps[sc_deaths]*100,
-      0.1*comps[sc_hs]/comps[sc_kills]*100,
-      0.4*comps[sc_used_prs],
-      0.1*(comps[sc_used_prs] - comps[sc_bought_prs]),
+      0.6*comps[sc_kills]/comps[sc_deaths]*100,
+      0.4*comps[sc_hs]/comps[sc_kills]*100,
       tb_get_player_skill(pid_info)
     );
   }
@@ -490,6 +500,7 @@ public handle_player_info_menu(pid, menu, item)
   menu_destroy(menu);
   return PLUGIN_HANDLED;
 }
+#endif // TB_BHVR_EXTERNAL_SKILL_COMPUTATION
 
 /* Utilties */
 

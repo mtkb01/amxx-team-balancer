@@ -11,6 +11,16 @@
 #define TB_VERSION  "0.1.0-beta"
 #define TB_AUTHOR   "prnl0"
 
+/* Behaviours */
+
+/* Delegate players skill computation to external plugin, the result of which is
+ * provided to Team Balancer through the `tb_set_player_skill` native.
+ *
+ * Note: disables player skill components menu. */
+#define TB_BHVR_EXTERNAL_SKILL_COMPUTATION
+
+/* Natives */
+
 /*
  * Tries to force a balancing attempt at the end of the current round.
  *
@@ -19,6 +29,8 @@
  * @noreturn
  */
 native tb_balance(pid);
+
+/* Forwards */
 
 /*
  * Called during balance necessity checks.

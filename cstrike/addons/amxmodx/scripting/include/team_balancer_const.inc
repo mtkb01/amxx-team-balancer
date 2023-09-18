@@ -128,6 +128,7 @@ enum ImmunityType
  */
 #define MAX_FMT_NAME_LENGTH 21
 
+#if !defined TB_BHVR_EXTERNAL_SKILL_COMPUTATION
 /* TB:SKILL */
 
 /*
@@ -137,7 +138,6 @@ enum SkillComponent
 {
   sc_kills = 1,
   sc_deaths,
-  sc_hs,
-  sc_used_prs,
-  sc_bought_prs
+  sc_hs
 }
+#endif // TB_BHVR_EXTERNAL_SKILL_COMPUTATION

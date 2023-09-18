@@ -10,6 +10,9 @@
 
 #include <team_balancer_const>
 
+/* Natives */
+
+#if !defined TB_BHVR_EXTERNAL_SKILL_COMPUTATION
 /*
  * Retrieves a players' individual skill component.
  *
@@ -19,6 +22,7 @@
  * @return                  Skill component of player identified by `pid`.
  */
 native tb_get_player_skill_comp(const pid, const SkillComponent:component);
+#endif // TB_BHVR_EXTERNAL_SKILL_COMPUTATION
 
 /*
  * Retrieves a players' skill rating.
@@ -28,6 +32,18 @@ native tb_get_player_skill_comp(const pid, const SkillComponent:component);
  * @return            Skill of player identified by `pid`.
  */
 native Float:tb_get_player_skill(const pid);
+
+#if defined TB_BHVR_EXTERNAL_SKILL_COMPUTATION
+/*
+ * Sets a players' skill rating.
+ *
+ * @param pid         Player ID whose skill rating to set.
+ * @param skill       Skill rating to set.
+ *
+ * @noreturn
+ */
+native tb_set_player_skill(const pid, Float:skill);
+#endif // TB_BHVR_EXTERNAL_SKILL_COMPUTATION
 
 /*
  * Retrieves aggregate skill rating of players within a specified team.
@@ -71,6 +87,8 @@ native Float:tb_get_team_skill_diff();
  * @return            Team with higher aggregate skill.
  */
 native CsTeams:tb_get_stronger_team();
+
+/* Forwards */
 
 /*
  * Called when skill difference between teams has changed.
