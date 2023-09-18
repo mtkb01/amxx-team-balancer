@@ -316,7 +316,7 @@ As for the skill computation itself, it is either delegated to an external plugi
 $$0.6k\cdot\frac{\text{kills}}{\text{deaths}} + 0.4k\cdot\frac{\text{headshots}}{\text{kills}}\text{,}$$
 where $k = 100$ is the scaling factor.
 
-If skill rating is computed externally, we do not provide a means to make the individual components accessible from the UI; as such, the skill rating component menu becomes disabled.
+If the skill rating is computed externally, we do not provide a means to make the individual components accessible from the UI; as such, the skill rating component menu becomes disabled.
 
 ### Triggers
 
