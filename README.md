@@ -312,9 +312,11 @@ _Note: the min. and max. values are not currently enforced, and are only provide
 
 When a map is loaded, we wait `tb_delay_before_start` seconds before doing anything. After this delay has elapsed, we check, at the end of each round, whether certain triggers (see [§ Triggers](#triggers)) were activated (or should be activated, in the case of regular (round-based) triggers). If they have, and if the difference in skill or player count between the two teams is significant (this being defined by `tb_skill_diff_threshold` and `tb_player_count_threshold`, respectively), and both teams have at least 2 players, we attempt to balance them using either one of three balancing strategies (see [§ Balancing strategies](#balancing-strategies)). _(Note: this, and the delay can be overriden by a forced balancing that has higher precedence and can be invoked by either the server or a player with appropriate access.)_ To do this, we evaluate the result transferring a certain player would yield using three different algorithms (see [§ Algorithms](#algorithms)) to identify the best candidates for transfer. If any are found, and result in a sufficient skill diff. delta (`tb_skill_min_diff_global_delta`), we perform the transfers; otherwise, we hold that the balancing has failed, and wait for the triggers to be activated again.
 
-The skill rating itself is computed 0.5 s after a client is `putinserver` (though it should probably be computed immediately, without delay). Currently, the function that performs the actual computation ([`compute_skill`](https://github.com/prnl0/amxx-team-balancer/blob/111167f15633da1c9d0cfa24f4fb76d9e9264dbe/cstrike/addons/amxmodx/scripting/team_balancer_skill.sma#L163-L176)) is hardcoded and uses the following formula:
-$$0.4k\cdot\frac{\text{kills}}{\text{deaths}} + 0.1k\cdot\frac{\text{headshots}}{\text{kills}} + 0.4\text{prs}\_\text{used} + 0.1\cdot(\text{prs}\_\text{used} - \text{prs}\_\text{bought})\text{,}$$
+As for the skill computation itself, it is either delegated to an external plugin, or derived through trivial means locally, depending on whether `TB_BHVR_EXTERNAL_SKILL_COMPUTATION` was defined during compilation. If it was, we expect the skill rating to be supplied to us through the `tb_set_player_skill` native; otherwise, we recompute it upon a players' death according to
+$$0.6k\cdot\frac{\text{kills}}{\text{deaths}} + 0.4k\cdot\frac{\text{headshots}}{\text{kills}}\text{,}$$
 where $k = 100$ is the scaling factor.
+
+If skill rating is computed externally, we do not provide a means to make the individual components accessible from the UI; as such, the skill rating component menu becomes disabled.
 
 ### Triggers
 
