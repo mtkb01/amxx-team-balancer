@@ -23,7 +23,7 @@
 #define XO_TEAM 114
 
 #if defined DEBUG
-  #define DEBUG_DIR "addons/amxmodx/logs/others"
+  #define DEBUG_DIR "addons/amxmodx/logs/others/team_balancer"
   #define LOG(%0) log_to_file(g_log_filepath, %0)
   #define LOG_PLAYERS log_players
 
