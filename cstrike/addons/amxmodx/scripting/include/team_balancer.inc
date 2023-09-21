@@ -11,6 +11,8 @@
 #define TB_VERSION  "0.1.0-beta"
 #define TB_AUTHOR   "prnl0"
 
+#define TB_DICTIONARY "team_balancer.txt"
+
 /* Behaviours */
 
 /* Delegate players skill computation to external plugin, the result of which is

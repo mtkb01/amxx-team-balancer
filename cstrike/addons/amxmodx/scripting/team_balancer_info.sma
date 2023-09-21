@@ -8,8 +8,6 @@
 
 #define TB_PLUGIN "Team Balancer: Notify"
 
-#define DICTIONARY "team_balancer.txt"
-
 new g_pcvar_prefix;
 new g_pcvar_print_names_to_console;
 new g_pcvar_info_checking;
@@ -24,7 +22,7 @@ new g_prefix[MAX_PREFIX_LENGTH + 1];
 public plugin_init()
 {
   register_plugin(TB_PLUGIN, TB_VERSION, TB_AUTHOR);
-  register_dictionary(DICTIONARY);
+  register_dictionary(TB_DICTIONARY);
 
   /* CVars */
 

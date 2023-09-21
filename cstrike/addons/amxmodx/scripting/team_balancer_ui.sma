@@ -56,6 +56,7 @@ new Array:g_pids;
 public plugin_init()
 {
   register_plugin(TB_PLUGIN, TB_VERSION, TB_AUTHOR);
+  register_dictionary(TB_DICTIONARY);
 
   /* CVars */
 
