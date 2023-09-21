@@ -26,7 +26,7 @@ public plugin_init()
 
   /* CVars */
 
-  g_pcvar_prefix                      = register_cvar("tb_info_prefix", "^3[TB]^1 ");
+  g_pcvar_prefix                      = register_cvar("tb_info_prefix", "^4[TB]^1 ");
   g_pcvar_print_names_to_console      = register_cvar("tb_info_print_names_to_console", "0");
   g_pcvar_info_checking               = register_cvar("tb_info_checking_balance", "1");
   g_pcvar_info_balance_check_results  = register_cvar("tb_info_balance_check_results", "1");
