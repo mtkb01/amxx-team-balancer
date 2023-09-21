@@ -1035,7 +1035,9 @@ log_team(str[], maxlen, const team[], CsTeams:team_id)
   for (new i = 0; i != playersnum; ++i) {
     get_user_name(players[i], name, charsmax(name));
     formatex(
-      str, maxlen, "%s    %d. %s: %.1f^n", str, i, name, tb_get_player_skill(players[i])
+      str, maxlen,
+      "%s    %d (PID: %d). %s: %.1f^n",
+      str, i, players[i], name, tb_get_player_skill(players[i])
     );
   }
 }
