@@ -93,6 +93,9 @@ native CsTeams:tb_get_stronger_team();
 /*
  * Called when skill difference between teams has changed.
  *
+ * @param old_diff        Previous skill difference.
+ * @param new_diff        New skill difference.
+ *
  * @noreturn
  */
-forward tb_skill_diff_changed();
+forward tb_skill_diff_changed(Float:old_diff, Float:new_diff);

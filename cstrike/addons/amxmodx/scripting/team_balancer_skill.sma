@@ -43,7 +43,8 @@ public plugin_init()
 
   /* Forwards */
 
-  g_fw_skill_diff_changed = CreateMultiForward("tb_skill_diff_changed", ET_IGNORE);
+  g_fw_skill_diff_changed =
+    CreateMultiForward("tb_skill_diff_changed", ET_IGNORE, FP_FLOAT, FP_FLOAT);
 
 #if !defined TB_BHVR_EXTERNAL_SKILL_COMPUTATION
   /* Events */
@@ -242,7 +243,7 @@ public check_skill_diff()
   static Float:skill_diff = 0.0;
   new Float:diff = get_team_skill_diff();
   if (skill_diff != diff) {
+    ExecuteForward(g_fw_skill_diff_changed, _, skill_diff, diff);
     skill_diff = diff;
-    ExecuteForward(g_fw_skill_diff_changed);
   }
 }
