@@ -1,7 +1,12 @@
 /* TODO:
  *   - consider keeping track of players manually, instead of calling
  *     `get_playersnum_ex` each time;
- *   - add time-based balance checks (i.e., every `n` seconds). */
+ *   - add time-based balance checks (i.e., every `n` seconds);
+ *   - add cvar to control from which skill diff. to not care about player count
+ *     diff. (e.g., if weaker team has an advantage in numbers of 2 vs 6 but
+ *     skill diff. is 4000 vs 20, don't transfer players from weaker team even
+ *     though player count diff. threshold might be 2 or 3). A value of `-1`
+ *     would indicate that player count diff. must always be taken into account. */
 
 #include <amxmodx>
 #include <amxmisc>
@@ -158,10 +163,14 @@ public client_disconnected(pid, bool:drop, message[], maxlen)
     (team != CS_TEAM_SPECTATOR && team != CS_TEAM_UNASSIGNED)
     && get_pcvar_num(g_pcvar_balance_check_trigger) == _:bct_player_connect_disconnect
   ) {
+#if defined DEBUG
+    new name[MAX_NAME_LENGTH + 1];
+    get_user_name(pid, name, charsmax(name));
     LOG( \
-      "[TB:CORE::client_disconnected] Player disconnected (team: %d): g_needs_balance_check -> \
-      true", team \
+      "[TB:CORE::client_disconnected] ^"%s^" disconnected (team: %d): g_needs_balance_check -> \
+      true", name, team \
     );
+#endif // DEBUG
     g_needs_balance_check = true;
   }
 }
