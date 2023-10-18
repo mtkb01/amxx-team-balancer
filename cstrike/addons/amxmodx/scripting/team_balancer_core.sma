@@ -132,7 +132,24 @@ public client_putinserver(pid)
   /* Remove the players' default immunity. */
   g_rounds_elapsed[pid] = get_pcvar_num(g_pcvar_immunity_amount) + 1;
   g_balancings_invoked[pid] = g_rounds_elapsed[pid];
+
+#if defined DEBUG
+  new data[1]; data[0] = pid;
+  set_task_ex(2.0, "debug_client_putinserver", .parameter = data, .len = 1);
+#endif // DEBUG
 }
+
+#if defined DEBUG
+public debug_client_putinserver(pid)
+{
+  new name[MAX_NAME_LENGTH + 1];
+  get_user_name(pid, name, charsmax(name));
+  LOG( \
+    "[TB:CORE::debug_client_putinserver] ^"%s^" connected. [Skill: %.1f]", \
+    name, tb_get_player_skill(pid) \
+  );
+}
+#endif // DEBUG
 
 public client_disconnected(pid, bool:drop, message[], maxlen)
 {
@@ -198,10 +215,13 @@ public native_balance(plugin, argc)
 
 /* Forwards */
 
-public tb_skill_diff_changed()
+public tb_skill_diff_changed(Float:old_diff, Float:new_diff)
 {
   if (get_pcvar_num(g_pcvar_balance_check_trigger) == _:bct_skill_diff_changed) {
-    LOG("[TB:CORE::tb_skill_diff_changed] Skill diff. changed: g_needs_balance_check -> true");
+    LOG( \
+      "[TB:CORE::tb_skill_diff_changed] Skill diff. changed (was: %.1f; now: %.1f): \
+      g_needs_balance_check -> true", old_diff, new_diff \
+    );
     g_needs_balance_check = true;
   }
 }
@@ -288,6 +308,18 @@ bool:needs_balancing(bool:suppress_fw = false)
   if (!suppress_fw) {
     ExecuteForward(g_fw_checking_balance);
   }
+
+  LOG("[TB:CORE::needs_balancing] Checking team balance.");
+  LOG( \
+    "[TB:CORE::needs_balancing] T skill: %.1f; CT skill: %.1f; difference: %.1f.", \
+    tb_get_team_skill(CS_TEAM_T), tb_get_team_skill(CS_TEAM_CT), \
+    tb_get_team_skill_diff() \
+  );
+  LOG( \
+    "[TB:CORE::needs_balancing] T count: %d; CT count: %d", \
+    get_playersnum_ex(GetPlayers_MatchTeam, "TERRORIST"), \
+    get_playersnum_ex(GetPlayers_MatchTeam, "CT") \
+  );
 
   /* Balance if skill difference exceeds some threshold, or ... */
   if (tb_get_team_skill_diff() >= get_pcvar_float(g_pcvar_skill_threshold)) {
