@@ -34,7 +34,7 @@ enum _:e_player
 
 new const g_clcmds[][][32 + 1] = 
 {
-  {"/skill", "handle_say_skill"}
+  { "/skill", "handle_say_skill" }
 };
 
 new g_pcvar_delay_before_start;

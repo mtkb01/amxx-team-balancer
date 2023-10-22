@@ -1,12 +1,11 @@
 /* TODO:
- *   - consider keeping track of players manually, instead of calling
- *     `get_playersnum_ex` each time;
  *   - add time-based balance checks (i.e., every `n` seconds);
  *   - add cvar to control from which skill diff. to not care about player count
  *     diff. (e.g., if weaker team has an advantage in numbers of 2 vs 6 but
  *     skill diff. is 4000 vs 20, don't transfer players from weaker team even
  *     though player count diff. threshold might be 2 or 3). A value of `-1`
- *     would indicate that player count diff. must always be taken into account. */
+ *     would indicate that player count diff. must always be taken into account;
+ *   - don't check balance when 1v1 or less. */
 
 #include <amxmodx>
 #include <amxmisc>
@@ -19,14 +18,10 @@
 #include <team_balancer_stocks>
 #include <team_balancer_const>
 
-#define DEBUG
-
 #define TB_PLUGIN "Team Balancer: Core"
-
 #define TB_CONFIG "team_balancer.cfg"
 
-#define XO_TEAM 114
-
+#define DEBUG
 #if defined DEBUG
   #define DEBUG_DIR "addons/amxmodx/logs/others/team_balancer"
   #define LOG(%0) log_to_file(g_log_filepath, %0)
@@ -37,6 +32,23 @@
 #else
   #define LOG(%0) //
 #endif
+
+#define GET_PLAYERS_BY_SKILL() \
+  new Array:wkr_tm_players;                   \
+  new Array:str_tm_players;                   \
+  new wkr_tm_playersnum;                      \
+  new str_tm_playersnum;                      \
+  if (tb_get_stronger_team() == CS_TEAM_T) {  \
+    wkr_tm_players = g_cts;                   \
+    str_tm_players = g_ts;                    \
+    wkr_tm_playersnum = g_ctnum;              \
+    str_tm_playersnum = g_tnum;               \
+  } else {                                    \
+    wkr_tm_players = g_cts;                   \
+    str_tm_players = g_ts;                    \
+    wkr_tm_playersnum = g_ctnum;              \
+    str_tm_playersnum = g_tnum;               \
+  }
 
 new g_pcvar_balancing_strategy;
 new g_pcvar_skill_threshold;
@@ -58,6 +70,14 @@ new g_fw_forced_balancing;
 new g_fw_players_transferred;
 new g_fw_players_switched;
 new g_fw_balancing_failed;
+
+public Array:g_players;
+public Array:g_ts;
+public Array:g_cts;
+
+public g_pnum;
+public g_tnum;
+public g_ctnum;
 
 new bool:g_needs_balance_check;
 public g_rounds_since_last_balance_check;
@@ -92,17 +112,34 @@ public plugin_init()
   g_fw_players_switched     = CreateMultiForward("tb_players_switched", ET_IGNORE, FP_CELL);
   g_fw_balancing_failed     = CreateMultiForward("tb_balancing_failed", ET_IGNORE);
 
+  /* Messages */
+
+  register_message(get_user_msgid("ShowMenu"), "message_showmenu");
+  register_message(get_user_msgid("VGUIMenu"), "message_vguimenu");
+
   /* Events */
 
   register_logevent("logevent_round_end", 2, "1=Round_End");
+  register_event_ex("TeamInfo", "event_join_team", RegisterEvent_Global);
 
 #if defined DEBUG
   new filename[20 + 1];
   get_time("tb_%Y_%m_%d.log", filename, charsmax(filename));
   formatex(g_log_filepath, charsmax(g_log_filepath), "%s/%s", DEBUG_DIR, filename);
 
-  register_event("HLTV", "event_new_round", "a", "1=0", "2=0");
+  register_event_ex("HLTV", "event_new_round", RegisterEvent_Global, "1=0", "2=0");
 #endif
+
+  /* Client commands */
+
+  register_clcmd("jointeam", "clcmd_jointeam");
+  register_clcmd("joinclass", "clcmd_joinclass");
+
+  /* Miscellaneous */
+
+  g_players = ArrayCreate();
+  g_ts      = ArrayCreate();
+  g_cts     = ArrayCreate();
 
   LOG("[TB:CORE::plugin_init] Loaded.");
 }
@@ -129,49 +166,55 @@ public plugin_natives()
 
 public client_putinserver(pid)
 {
-  if (get_pcvar_num(g_pcvar_balance_check_trigger) == _:bct_player_connect_disconnect) {
-    LOG("[TB:CORE::client_putinserver] Player connected: g_needs_balance_check -> true");
-    g_needs_balance_check = true;
-  }
-
-  /* Remove the players' default immunity. */
-  g_rounds_elapsed[pid] = get_pcvar_num(g_pcvar_immunity_amount) + 1;
-  g_balancings_invoked[pid] = g_rounds_elapsed[pid];
-
-#if defined DEBUG
-  new data[1]; data[0] = pid;
-  set_task_ex(2.0, "debug_client_putinserver", .parameter = data, .len = 1);
-#endif // DEBUG
+  ArrayPushCell(g_players, pid);
+  ++g_pnum;
 }
-
-#if defined DEBUG
-public debug_client_putinserver(pid)
-{
-  new name[MAX_NAME_LENGTH + 1];
-  get_user_name(pid, name, charsmax(name));
-  LOG( \
-    "[TB:CORE::debug_client_putinserver] ^"%s^" connected. [Skill: %.1f]", \
-    name, tb_get_player_skill(pid) \
-  );
-}
-#endif // DEBUG
 
 public client_disconnected(pid, bool:drop, message[], maxlen)
 {
+  if (!is_user_connected(pid)) {
+    return;
+  }
+
+  arr_remove_unique(g_players, pid);
+  arr_remove_unique(g_ts, pid);
+  arr_remove_unique(g_cts, pid);
+
+  g_pnum = ArraySize(g_players);
+  g_tnum = ArraySize(g_ts);
+  g_ctnum = ArraySize(g_cts);
+
   new CsTeams:team = CsTeams:get_user_team(pid);
-  if (
-    (team != CS_TEAM_SPECTATOR && team != CS_TEAM_UNASSIGNED)
-    && get_pcvar_num(g_pcvar_balance_check_trigger) == _:bct_player_connect_disconnect
-  ) {
+
+  // if (
+  //   (team != CS_TEAM_SPECTATOR && team != CS_TEAM_UNASSIGNED)
+  //   && get_pcvar_num(g_pcvar_balance_check_trigger) == _:bct_player_connect_disconnect
+  // ) {
+  // }
+
+  /* TODO: temporarily made this mandatory despite `tb_balance_check_trigger`,
+   *       because skill check wasn't being triggered on player disconnect
+   *       anywhere else. */
 #if defined DEBUG
-    new name[MAX_NAME_LENGTH + 1];
-    get_user_name(pid, name, charsmax(name));
-    LOG( \
-      "[TB:CORE::client_disconnected] ^"%s^" disconnected (team: %d): g_needs_balance_check -> \
-      true", name, team \
-    );
+  new name[MAX_NAME_LENGTH + 1];
+  get_user_name(pid, name, charsmax(name));
+  LOG( \
+    "[TB:CORE::client_disconnected] ^"%s^" disconnected (team: %d): g_needs_balance_check -> \
+    true", name, team \
+  );
+  LOG("[TB:CORE::client_disconnected] T count: %d; CT count: %d.", g_tnum, g_ctnum);
 #endif // DEBUG
-    g_needs_balance_check = true;
+  g_needs_balance_check = true;
+
+  /* Handle edge case wherein a whole team has disconnected mid-match. */
+  if ((g_tnum > 1 || g_ctnum > 1) && (g_tnum == 0 || g_ctnum == 0)) {
+    LOG( \
+      "[TB:CORE::client_disconnected] Whole team (%d) disconnected. Force balancing.", team \
+    );
+    balance();
+    g_needs_balance_check = false;
+    server_cmd("sv_restart 3");
+    server_exec();
   }
 }
 
@@ -235,7 +278,77 @@ public tb_skill_diff_changed(Float:old_diff, Float:new_diff)
   }
 }
 
-/* Hooks */
+/* Messages */
+
+/* Partially taken from https://forums.alliedmods.net/showthread.php?t=69819 by
+ * Exolent */
+public message_showmenu(msg_id, msg_dest, msg_ent)
+{
+#define FIRST_JOIN_MSG        "#Team_Select"
+#define FIRST_JOIN_MSG_SPEC   "#Team_Select_Spect"
+#define INGAME_JOIN_MSG       "#IG_Team_Select"
+#define INGAME_JOIN_MSG_SPEC  "#IG_Team_Select_Spect"
+#define MENU_CODE_MAXLEN      21
+
+  static menu_code[MENU_CODE_MAXLEN + 1];
+  get_msg_arg_string(4, menu_code, charsmax(menu_code));
+  if (equal(menu_code, FIRST_JOIN_MSG) || equal(menu_code, FIRST_JOIN_MSG_SPEC)) {
+    new data[2]; data[0] = msg_ent; data[1] = msg_id;
+    set_task_ex(1.0, "force_join", _, data, sizeof(data));
+    return PLUGIN_HANDLED;
+  /* Block team change mid-game. */
+  } else if (equal(menu_code, INGAME_JOIN_MSG) || equal(menu_code, INGAME_JOIN_MSG_SPEC)) {
+    /* TODO: allow admins with certain access flags to bypass this, as well as
+     *       regulars if some CVar is set. */
+    return PLUGIN_HANDLED;
+  }
+
+  return PLUGIN_CONTINUE;
+}
+
+public message_vguimenu(msg_id, msg_dest, msg_ent)
+{
+#define VGUI_JOIN_TEAM_NUM 2
+  if (get_msg_arg_int(1) == VGUI_JOIN_TEAM_NUM) {
+    new data[2]; data[0] = msg_ent; data[1] = msg_id;
+    set_task_ex(1.0, "force_join", _, data, sizeof(data));
+    return PLUGIN_HANDLED;
+  }
+  return PLUGIN_CONTINUE;
+}
+
+public force_join(const data[2])
+{
+  new pid = data[0];
+  new msg_id = data[1];
+
+#if defined TB_BHVR_EXTERNAL_SKILL_COMPUTATION
+  new Float:skill = tb_get_player_skill(pid);
+  new Float:t_skill = tb_get_team_skill(CS_TEAM_T);
+  new Float:ct_skill = tb_get_team_skill(CS_TEAM_CT);
+  new Float:join_t_skill_diff = floatabs(t_skill + skill - ct_skill);
+  new Float:join_ct_skill_diff = floatabs(ct_skill + skill - t_skill);
+  new pc_diff_threshold = get_pcvar_num(g_pcvar_player_count_threshold);
+
+  if (join_t_skill_diff < join_ct_skill_diff) {
+    join_team(pid, g_tnum - g_ctnum <= pc_diff_threshold ? CS_TEAM_T : CS_TEAM_CT, msg_id);
+  } else if (join_t_skill_diff > join_ct_skill_diff) {
+    join_team(pid, g_ctnum - g_tnum <= pc_diff_threshold ? CS_TEAM_CT : CS_TEAM_T, msg_id);
+  } else if (g_tnum == g_ctnum) {
+    join_team(pid, CsTeams:random_num(_:CS_TEAM_T, _:CS_TEAM_CT), msg_id);
+  } else {
+    join_team(pid, g_tnum > g_ctnum ? CS_TEAM_CT : CS_TEAM_T, msg_id);
+  }
+#else
+  if (g_tnum == g_ctnum) {
+    join_team(pid, CsTeams:random_num(_:CS_TEAM_T, _:CS_TEAM_CT), msg_id);
+  } else {
+    join_team(pid, g_tnum > g_ctnum ? CS_TEAM_CT : CS_TEAM_T, msg_id);
+  }
+#endif // TB_BHVR_EXTERNAL_SKILL_COMPUTATION
+}
+
+/* Events */
 
 public logevent_round_end()
 {
@@ -274,7 +387,62 @@ public logevent_round_end()
   g_needs_balance_check = false;
 }
 
+public event_join_team()
+{
+  new pid = read_data(1);
+  new idx_t = ArrayFindValue(g_ts, pid);
+  new idx_ct = ArrayFindValue(g_cts, pid);
+  new team[2];
+  read_data(2, team, charsmax(team));
+
+  if (idx_t == -1 && idx_ct == -1) {
+    if (team[0] != 'T' && team[0] != 'C') {
+      return;
+    }
+
+    if (get_pcvar_num(g_pcvar_balance_check_trigger) == _:bct_player_connect_disconnect) {
+      LOG("[TB:CORE::event_join_team] Player joined team: g_needs_balance_check -> true");
+      g_needs_balance_check = true;
+    }
+
+    /* Remove the players' default immunity. */
+    g_rounds_elapsed[pid] = get_pcvar_num(g_pcvar_immunity_amount) + 1;
+    g_balancings_invoked[pid] = g_rounds_elapsed[pid];
+
 #if defined DEBUG
+    new data[1]; data[0] = pid;
+    set_task_ex(0.1, "debug_event_join_team", .parameter = data, .len = 1);
+#endif // DEBUG
+
+    ArrayPushCell(team[0] == 'T' ? g_ts : g_cts, pid);
+  } else if (idx_t != -1 && team[0] != 'T') {
+    ArrayDeleteItem(g_ts, idx_t);
+    if (team[0] == 'C') {
+      ArrayPushCell(g_cts, pid);
+    }
+  } else if (idx_ct != -1 && team[0] != 'C') {
+    ArrayDeleteItem(g_cts, idx_ct);
+    if (team[0] == 'T') {
+      ArrayPushCell(g_ts, pid);
+    }
+  }
+
+  g_tnum = ArraySize(g_ts);
+  g_ctnum = ArraySize(g_cts);
+}
+
+#if defined DEBUG
+public debug_event_join_team(data[1])
+{
+  new name[MAX_NAME_LENGTH + 1];
+  get_user_name(data[0], name, charsmax(name));
+  LOG( \
+    "[TB:CORE::debug_event_join_team] ^"%s^" connected. [Skill: %.1f]", \
+    name, tb_get_player_skill(data[0]) \
+  );
+  LOG("[TB:CORE::debug_event_join_team] T count: %d; CT count: %d.", g_tnum, g_ctnum);
+}
+
 public event_new_round()
 {
   if (g_balanced) {
@@ -282,7 +450,19 @@ public event_new_round()
     LOG_PLAYERS(false);
   }
 }
-#endif
+#endif // DEBUG
+
+/* Client commands */
+
+public clcmd_jointeam(pid)
+{
+  return PLUGIN_HANDLED_MAIN;
+}
+
+public clcmd_joinclass(pid)
+{
+  return PLUGIN_HANDLED_MAIN;
+}
 
 /* Main logic */
 
@@ -298,10 +478,7 @@ bool:can_check_balance()
     return false;
   }
 
-  if (
-    get_playersnum_ex(GetPlayers_MatchTeam, "CT") <= 1
-    && get_playersnum_ex(GetPlayers_MatchTeam, "TERRORIST") <= 1
-  ) {
+  if (g_ctnum <= 1 && g_tnum <= 1) {
     LOG( \
       "[TB:CORE::logevent_round_end] CTs and Ts have 1 or less players each. Won't balance. \
       Leaving." \
@@ -324,11 +501,7 @@ bool:needs_balancing(bool:suppress_fw = false)
     tb_get_team_skill(CS_TEAM_T), tb_get_team_skill(CS_TEAM_CT), \
     tb_get_team_skill_diff() \
   );
-  LOG( \
-    "[TB:CORE::needs_balancing] T count: %d; CT count: %d", \
-    get_playersnum_ex(GetPlayers_MatchTeam, "TERRORIST"), \
-    get_playersnum_ex(GetPlayers_MatchTeam, "CT") \
-  );
+  LOG("[TB:CORE::needs_balancing] T count: %d; CT count: %d.", g_tnum, g_ctnum);
 
   /* Balance if skill difference exceeds some threshold, or ... */
   if (tb_get_team_skill_diff() >= get_pcvar_float(g_pcvar_skill_threshold)) {
@@ -340,12 +513,19 @@ bool:needs_balancing(bool:suppress_fw = false)
   }
 
   /* ... teams differ in player numbers by some amount. */
-  new player_count_diff = abs(get_playersnum_ex(GetPlayers_MatchTeam, "CT") -
-    get_playersnum_ex(GetPlayers_MatchTeam, "TERRORIST"));
-  if (player_count_diff > get_pcvar_num(g_pcvar_player_count_threshold)) {
+  new pc_diff = abs(g_tnum - g_ctnum);
+  if (pc_diff > get_pcvar_num(g_pcvar_player_count_threshold)) {
     LOG( \
       "[TB:CORE::needs_balancing] Balancing: necessary (player count diff. [%d] exceeds \
-      threshold [%d]).", player_count_diff, get_pcvar_num(g_pcvar_player_count_threshold) \
+      threshold [%d]).", pc_diff, get_pcvar_num(g_pcvar_player_count_threshold) \
+    );
+    return true;
+  }
+
+  if ((g_tnum > 1 || g_ctnum > 1) && (g_tnum == 0 || g_ctnum == 0)) {
+    LOG( \
+      "[TB:CORE::needs_balancing] Balancing: necessary (one team has more than \
+      1 player while the other is empty)" \
     );
     return true;
   }
@@ -359,8 +539,10 @@ bool:balance(bool:inform = true)
 {
   /* TODO: consider merging the methods somehow. */
 
-  handle_player_count_diff();
-  if (!needs_balancing(true)) {
+  /* Attempt to correct player count disbalance by moving players from weaker to
+   * stronger team, with the opposite case being handled further below. */
+  handle_player_count_diff(.handle_wkr = true);
+  if (!needs_balancing(.suppress_fw = true)) {
     LOG("[TB:CORE::balance] Player count diff. reduced. Balancing no longer necessary. Leaving.");
     return false;
   }
@@ -375,7 +557,10 @@ bool:balance(bool:inform = true)
     {tt_switch, tt_chain_evaluated_unidir, tt_simple_unidir}
   };
 
-  LOG("[TB:CORE::balance] Attempting to balance using %d strategy.", _:strat);
+  LOG( \
+    "[TB:CORE::balance] Attempting to balance using ^"%s^" strategy.", \
+    strat == bs_performance ? "performance" : strat == bs_balance ? "balance" : "best diff." \
+  );
   LOG_PLAYERS(true);
 
   /* Try all balancing methods. If `diff` satisfies min. desired skill, and the
@@ -395,7 +580,8 @@ bool:balance(bool:inform = true)
         "[TB:CORE::balance] New skill diff. (%.1f) is either greater than the previous skill diff. \
         (%1.f), or the skill diff. delta doesn't satisfy `tb_min_skill_diff_global_delta` (needed: \
         %.1f; found: %.1f). Skipping.", \
-        diff, final_diff, get_pcvar_float(g_pcvar_min_diff_global_delta), floatabs(final_diff - diff) \
+        diff, final_diff, get_pcvar_float(g_pcvar_min_diff_global_delta), \
+        floatabs(final_diff - diff) \
       );
       ArrayDestroy(pids);
       continue;
@@ -424,6 +610,9 @@ bool:balance(bool:inform = true)
     LOG("[TB:CORE::balance] Balancing failed.");
     ExecuteForward(g_fw_balancing_failed);
     ArrayDestroy(final_pids);
+    /* Reasoning similar to below: if we failed to balance, at least try to
+     * mitigate player count diff. violation, if present. */
+    handle_player_count_diff(.handle_wkr = false, .force = true);
     return false;
   }
 
@@ -439,136 +628,94 @@ bool:balance(bool:inform = true)
 
   ArrayDestroy(final_pids);
 
-  /* FIXME?: might have to make sure player counts do not differ marginally
-   * here. Hoping that balancing handles them automatically. */
+  /* Make sure player count diff. doesn't violate threshold after balancing. If
+   * it does, transfer weakest players from stronger team to affect skill diff.
+   * the least.
+   * Additionally, ensure each team has at least one player if there 2 or more
+   * players.
+   *
+   * NOTE: at this point, if player count diff. threshold is violated, the
+   *       stronger team is guaranteed to have more players as the opposite case
+   *       (the weaker team having more) is handled at the beginning. */ 
+  handle_player_count_diff(.handle_wkr = false, .force = true);
 
   increase_immunity_amt(.for_round_based_immunity = false);
 
   return true;
 }
 
-handle_player_count_diff()
+handle_player_count_diff(handle_wkr, bool:force = false)
 {
-  /* We only care when weaker team has more players; the other case should be
-   * handled through skill balancing. */
-  new CsTeams:str_tm = tb_get_stronger_team();
-  /* weaker_team_playersnum - stronger_team_playersnum */
-  new pc_diff =
-    get_playersnum_ex(GetPlayers_MatchTeam, str_tm == CS_TEAM_CT ? "TERRORIST" : "CT") -
-    get_playersnum_ex(GetPlayers_MatchTeam, str_tm == CS_TEAM_CT ? "CT" : "TERRORIST");
-  if (pc_diff <= get_pcvar_num(g_pcvar_player_count_threshold)) {
+  GET_PLAYERS_BY_SKILL()
+
+  /* Transfer weakest players to appropriate team to affect skill diff. least. */
+  new pc_diff = handle_wkr
+    ? wkr_tm_playersnum - str_tm_playersnum
+    : str_tm_playersnum - wkr_tm_playersnum;
+  if (pc_diff > get_pcvar_num(g_pcvar_player_count_threshold)) {
     LOG( \
-      "[TB:CORE::handle_player_count_diff] Player count diff. (%d) doesn't exceed threshold (%d), \
-      or weaker team has fewer players, in which case we cannot use them to reduce player count diff. \
-      Leaving.", pc_diff, get_pcvar_num(g_pcvar_player_count_threshold) \
+      "[TB:CORE::handle_player_count_diff] Player count diff. (%d) exceeds threshold (%d). \
+      Attempting to correct.", pc_diff, get_pcvar_num(g_pcvar_player_count_threshold) \
     );
+    /* FIXME?: might have to be `pc_diff/2`. */
+    new n = (pc_diff + 1)/2;
+    new Array:pids = handle_wkr
+      ? find_n_players_by_skill(wkr_tm_players, n, true)
+      : find_n_players_by_skill(str_tm_players, n, true);
+    transfer_players(pids);
+    ArrayDestroy(pids);
     return;
   }
 
-  new wkr_tm_players[MAX_PLAYERS];
-  new wkr_tm_playersnum = 0;
-  get_players_ex(
-    wkr_tm_players, wkr_tm_playersnum,
-    GetPlayers_MatchTeam, str_tm == CS_TEAM_CT ? "TERRORIST" : "CT"
-  );
-
-  new Array:weakest_pids = ArrayCreate();
-  /* FIXME?: make sure that integer division works the same way as in C++. */
-  LOG( \
-    "[TB:CORE::handle_player_count_diff] Looking for up to %d weakest players among the weaker \
-    team.", (pc_diff + 1)/2 \
-  );
-  for (new i = 0, end = (pc_diff + 1)/2; i != end; ++i) {
-    LOG("[TB:CORE::handle_player_count_diff] Looking for [%d] weakest player.", i + 1);
-
-    new Float:lowest_skill = 99999.0;
-    new weakest_pid = -1;
-    for (new j = 0; j != wkr_tm_playersnum; ++j) {
-      if (ArrayFindValue(weakest_pids, wkr_tm_players[j]) != -1) {
-        LOG( \
-          "[TB:CORE::handle_player_count_diff] Player (%d) is already present in `weakest_pids`. \
-          Skipping.", wkr_tm_players[j] \
-        );
-        continue;
-      }
-
-      new Float:skill = tb_get_player_skill(wkr_tm_players[j]);
-      if (skill < lowest_skill) {
-        LOG( \
-          "[TB:CORE::handle_player_count_diff] New [%d] weakest candidate: %d (%.1f). [Skill: %.1f \
-          -> %1.f]", i + 1, wkr_tm_players[j], skill, lowest_skill, skill \
-        );
-        lowest_skill = skill;
-        weakest_pid = wkr_tm_players[j];
-      }
-    }
-
-    if (weakest_pid == -1) {
-      LOG( \
-        "[TB:CORE::handle_player_count_diff] No other weakest candidate could be identified. \
-        Breaking out of loop." \
-      );
-      break;
-    } else {
-      LOG( \
-        "[TB:CORE::handle_player_count_diff] Pushing %d weakest player (PID: %d; skill: %.1f) onto \
-        `weakest_pids`.", i + 1, weakest_pid, tb_get_player_skill(weakest_pid) \
-      );
-      ArrayPushCell(weakest_pids, weakest_pid);
-    }
+  /* Transfer strongest player if we don't care about count diff. threshold, and
+   * other team is empty. */
+  if (
+    force && (
+      (wkr_tm_playersnum > 1 || str_tm_playersnum > 1) &&
+      (wkr_tm_playersnum == 0 || str_tm_playersnum == 0)
+    )
+  ) {
+    LOG( \
+      "[TB:CORE::handle_player_count_diff] One team has more than 1 player while the other has 0. \
+      Transferring strongest player to empty team." \
+    );
+    new Array:pids = wkr_tm_playersnum == 0
+      ? find_n_players_by_skill(wkr_tm_players, 1, false)
+      : find_n_players_by_skill(str_tm_players, 1, false);
+    transfer_players(pids);
+    ArrayDestroy(pids);
+    return;
   }
 
-  transfer_players(weakest_pids);
-  ArrayDestroy(weakest_pids);
+  LOG( \
+    "[TB:CORE::handle_player_count_diff] Player count diff. (%d) doesn't exceed threshold (%d). \
+    Leaving.", pc_diff, get_pcvar_num(g_pcvar_player_count_threshold) \
+  );
 }
 
 Array:find_transfers(TransferType:transfer_type, &Float:new_diff)
 {
-  new CsTeams:str_tm = tb_get_stronger_team();
-  new str_tm_players[MAX_PLAYERS];
-  new str_tm_playersnum = 0;
-  new wkr_tm_players[MAX_PLAYERS];
-  new wkr_tm_playersnum = 0;
-  get_players_ex(
-    str_tm_players, str_tm_playersnum,
-    GetPlayers_MatchTeam, str_tm == CS_TEAM_CT ? "CT" : "TERRORIST"
-  );
-  get_players_ex(
-    wkr_tm_players, wkr_tm_playersnum,
-    GetPlayers_MatchTeam, str_tm == CS_TEAM_CT ? "TERRORIST" : "CT"
-  );
+  GET_PLAYERS_BY_SKILL()
 
   /* Initially, new diff. is the base diff. */
   new_diff = tb_get_team_skill_diff();
 
   if (transfer_type == tt_simple_unidir) {
-    return find_simple_unidir_transfers(
-      new_diff,
-      str_tm_players, str_tm_playersnum,
-      wkr_tm_playersnum
-    );
+    return find_simple_unidir_transfers(new_diff, str_tm_players, wkr_tm_playersnum);
   } else if (transfer_type == tt_chain_evaluated_unidir) {
-    return find_chain_evaluated_unidir_transfers(
-      new_diff,
-      str_tm_players, str_tm_playersnum,
-      wkr_tm_playersnum
-    );
+    return find_chain_evaluated_unidir_transfers(new_diff, str_tm_players, wkr_tm_playersnum);
   } else {
-    return find_switches(
-      new_diff,
-      str_tm_players, str_tm_playersnum,
-      wkr_tm_players, wkr_tm_playersnum
-    );
+    return find_switches(new_diff, str_tm_players, wkr_tm_players);
   }
 }
 
-Array:find_simple_unidir_transfers(
-  &Float:new_diff, str_tm_players[], str_tm_playersnum, wkr_tm_playersnum
-) {
+Array:find_simple_unidir_transfers(&Float:new_diff, Array:str_tm_players, wkr_tm_playersnum) {
+  new str_tm_playersnum = ArraySize(str_tm_players);
+
   LOG( \
     "[TB:CORE::find_simple_unidir_transfers] Looking for simple unidirectional transfers. [Base \
     skill diff: %.1f; str. team players: %d; wkr. team players: %d]", \
-    new_diff, str_tm_playersnum, wkr_tm_playersnum \
+    new_diff, ArraySize(str_tm_players), wkr_tm_playersnum \
   );
 
   new Array:pids = ArrayCreate();
@@ -583,11 +730,13 @@ Array:find_simple_unidir_transfers(
     new best_pid = -1;
     new Float:best_diff = new_diff;
     for (new i = 0; i != str_tm_playersnum; ++i) {
+      new pid = ArrayGetCell(str_tm_players, i);
+
       /* Exclude players that are immune or were already chosen. */
-      if (is_player_immune(str_tm_players[i]) || ArrayFindValue(pids, str_tm_players[i]) != -1) {
+      if (is_player_immune(pid) || ArrayFindValue(pids, pid) != -1) {
         LOG( \
           "[TB:CORE::find_simple_unidir_transfers] Player (%d) is either immune or already present \
-          in `pids`. Skipping.", str_tm_players[i] \
+          in `pids`. Skipping.", pid \
         );
         continue;
       }
@@ -595,17 +744,16 @@ Array:find_simple_unidir_transfers(
       /* diff = (s_sum - s) - (w_sum + s)
        *      = (s_sum - w_sum) - 2*s
        *      = prev_diff - 2*s */
-      new Float:diff = new_diff - 2*tb_get_player_skill(str_tm_players[i]);
+      new Float:diff = new_diff - 2*tb_get_player_skill(pid);
       if (floatabs(diff) < floatabs(best_diff)) {
         LOG( \
           "[TB:CORE::find_simple_unidir_transfers] [%d] New best candidate: %d (%.1f). [Skill \
           diff: %.1f -> %.1f (abs. delta: %.1f)]", \
-          ArraySize(pids) + 1, \
-          str_tm_players[i], tb_get_player_skill(str_tm_players[i]), best_diff, diff, \
+          ArraySize(pids) + 1, pid, tb_get_player_skill(pid), best_diff, diff, \
           floatabs(best_diff - floatabs(diff)) \
         );
         best_diff = diff;
-        best_pid = str_tm_players[i];
+        best_pid = pid;
         /* TODO: depending on balancing strategy, we should probably check if
          * `best_diff` already satisfies `tb_min_desired_skill_diff` here rather
          * than deferring it to post-loop. */
@@ -679,8 +827,10 @@ Array:find_simple_unidir_transfers(
 }
 
 Array:find_chain_evaluated_unidir_transfers(
-  &Float:new_diff, str_tm_players[], str_tm_playersnum, wkr_tm_playersnum
+  &Float:new_diff, Array:str_tm_players, wkr_tm_playersnum
 ) {
+  new str_tm_playersnum = ArraySize(str_tm_players);
+
   new seq_str[64 + 1];
   LOG( \
     "[TB:CORE::find_chain_evaluated_unidir_transfers] Base skill diff: %.1f; str. team players: \
@@ -708,7 +858,7 @@ Array:find_chain_evaluated_unidir_transfers(
       for (new j = 0; j != n; ++j) {
         /* TODO: ensure player is not transferred if he yields little to no
          * change in skill diff. */
-        new pid = str_tm_players[ArrayGetCell(seq, j)];
+        new pid = ArrayGetCell(str_tm_players, ArrayGetCell(seq, j));
         if (!is_player_immune(pid)) {
           skill_sum += tb_get_player_skill(pid);
         } else {
@@ -781,7 +931,7 @@ Array:find_chain_evaluated_unidir_transfers(
     new_diff = floatabs(best_diff);
     new Array:pids = ArrayCreate();
     for (new i = 0; i != ArraySize(best_seq); ++i) {
-      ArrayPushCell(pids, str_tm_players[ArrayGetCell(best_seq, i)]);
+      ArrayPushCell(pids, ArrayGetCell(str_tm_players, ArrayGetCell(best_seq, i)));
     }
     LOG( \
       "[TB:CORE::find_chain_evaluated_unidir_transfers] Size of `pids`: %d", ArraySize(pids) \
@@ -792,11 +942,10 @@ Array:find_chain_evaluated_unidir_transfers(
   return Invalid_Array;
 }
 
-Array:find_switches(
-  &Float:new_diff,
-  str_tm_players[], str_tm_playersnum,
-  wkr_tm_players[], wkr_tm_playersnum
-) {
+Array:find_switches(&Float:new_diff, Array:str_tm_players, Array:wkr_tm_players) {
+  new str_tm_playersnum = ArraySize(str_tm_players);
+  new wkr_tm_playersnum = ArraySize(wkr_tm_players);
+
   LOG( \
     "[TB:CORE::find_switches] Looking for switches. [Base skill diff: %.1f; str. team players: %d; \
     wkr. team players: %d]", new_diff, str_tm_playersnum, wkr_tm_playersnum \
@@ -812,21 +961,25 @@ Array:find_switches(
     new best_pids[2] = { -1, -1 };
     new Float:best_diff = new_diff;
     for (new i = 0; i != str_tm_playersnum; ++i) {
+      new pid_str = ArrayGetCell(str_tm_players, i);
+
       /* Exclude players that are immune or were already chosen. */
-      if (is_player_immune(str_tm_players[i]) || pid_exists_in_pairs(pids, str_tm_players[i])) {
+      if (is_player_immune(pid_str) || pid_exists_in_pairs(pids, pid_str)) {
         LOG( \
           "[TB:CORE::find_switches] Player (%d) is either immune or already present in `pids`. \
-          Skipping.", str_tm_players[i] \
+          Skipping.", pid_str \
         );
         continue;
       }
 
       for (new j = 0; j != wkr_tm_playersnum; ++j) {
+        new pid_wkr = ArrayGetCell(wkr_tm_players, j);
+
         /* Exclude players that are immune or were already chosen. */
-        if (is_player_immune(wkr_tm_players[j]) || pid_exists_in_pairs(pids, wkr_tm_players[j])) {
+        if (is_player_immune(pid_wkr) || pid_exists_in_pairs(pids, pid_wkr)) {
           LOG( \
             "[TB:CORE::find_switches] Player (%d) is either immune or already present in `pids`. \
-            Skipping.", wkr_tm_players[j] \
+            Skipping.", pid_wkr \
           );
           continue;
         }
@@ -837,9 +990,7 @@ Array:find_switches(
          *
          * Ideal case would be (s - w) == prev_diff/2, which would yield a diff.
          * of 0. */
-        new Float:diff = new_diff - 2*(
-          tb_get_player_skill(str_tm_players[i]) - tb_get_player_skill(wkr_tm_players[j])
-        );
+        new Float:diff = new_diff - 2*(tb_get_player_skill(pid_str) - tb_get_player_skill(pid_wkr));
         /* TODO: explain logic (appears sound). */
         if (
           (best_diff > 0.0 && floatabs(diff) < best_diff)
@@ -849,13 +1000,13 @@ Array:find_switches(
             "[TB:CORE::find_switches] [%d] New best candidates: %d (%.1f) and %d (%.1f). [Skill \
             diff: %.1f -> %.1f (abs. delta: %.1f)]", \
             ArraySize(pids) + 1, \
-            str_tm_players[i], tb_get_player_skill(str_tm_players[i]), \
-            wkr_tm_players[j], tb_get_player_skill(wkr_tm_players[j]), \
+            pid_str, tb_get_player_skill(pid_str), \
+            pid_wkr, tb_get_player_skill(pid_wkr), \
             best_diff, diff, floatabs(floatabs(best_diff) - floatabs(diff)) \
           );
           best_diff = diff;
-          best_pids[0] = str_tm_players[i];
-          best_pids[1] = wkr_tm_players[j];
+          best_pids[0] = pid_str;
+          best_pids[1] = pid_wkr;
           /* TODO: depending on balancing strategy, we should probably check if
            * `best_diff` already satisfies `tb_min_desired_skill_diff` here
            * rather than deferring it to post-loop. */
@@ -926,23 +1077,19 @@ increase_immunity_amt(bool:for_round_based_immunity)
     return;
   }
 
-  new players[MAX_PLAYERS];
-  new playersnum = 0;
-  get_players_ex(players, playersnum, GetPlayers_ExcludeHLTV);
-  for (new i = 0; i != playersnum; ++i) {
+  for (new i = 0; i != g_pnum; ++i) {
+    new pid = ArrayGetCell(g_players, i);
     if (for_round_based_immunity) {
-      ++g_rounds_elapsed[players[i]];
+      ++g_rounds_elapsed[pid];
       LOG( \
         "[TB:CORE::increase_immunity_amt] Increasing rounds elapsed since they were last balanced \
-        for %d: %d -> %d", \
-        players[i], g_rounds_elapsed[players[i]] - 1, g_rounds_elapsed[players[i]] \
+        for %d: %d -> %d", pid, g_rounds_elapsed[pid] - 1, g_rounds_elapsed[pid] \
       );
     } else {
-      ++g_balancings_invoked[players[i]];
+      ++g_balancings_invoked[pid];
       LOG( \
         "[TB:CORE::increase_immunity_amt] Increasing balancings invoked since they were last \
-        balanced for %d: %d -> %d", \
-        players[i], g_balancings_invoked[players[i]] - 1, g_balancings_invoked[players[i]] \
+        balanced for %d: %d -> %d", pid, g_balancings_invoked[pid] - 1, g_balancings_invoked[pid] \
       );
     }
   }
@@ -967,7 +1114,7 @@ transfer_players(&Array:pids, bool:inform = true)
         "[TB:CORE::transfer_players] Transferring %d (%.1f) to %d.", \
         pid, tb_get_player_skill(pid), dst \
       );
-      cs_set_user_team(pid, dst, CS_NORESET, false);
+      transfer_player(pid, dst);
       /* Set to -1 here because `increase_immunity_amt` is invoked immediately
        * after balancing, thus resulting in an increment of these
        * state-tracking-params. */
@@ -1004,8 +1151,8 @@ switch_players(&Array:pairs, bool:inform = true)
       pids[0], tb_get_player_skill(pids[0]), pids[1], tb_get_player_skill(pids[1]) \
     );
     new team1 = get_user_team(pids[0]);
-    cs_set_user_team(pids[0], CsTeams:get_user_team(pids[1]), CS_NORESET, false);
-    cs_set_user_team(pids[1], CsTeams:team1, CS_NORESET, false);
+    transfer_player(pids[0], CsTeams:get_user_team(pids[1]));
+    transfer_player(pids[1], CsTeams:team1);
     /* Set to -1 here because `increase_immunity_amt` is invoked immediately
      * after balancing, thus resulting in an increment of these
      * state-tracking-params. */
@@ -1020,7 +1167,93 @@ switch_players(&Array:pairs, bool:inform = true)
   }
 }
 
+/* TODO: further generalize and use in balancing algorithms? */
+Array:find_n_players_by_skill(const Array:players, n, bool:weakest)
+{
+  new Array:pids = ArrayCreate();
+  LOG( \
+    "[TB:CORE::find_n_players_by_skill] Looking for up to %d %s players in single team.", \
+    n, weakest ? "weakest" : "strongest" \
+  );
+
+  for (new i = 0; i != n; ++i) {
+    LOG( \
+      "[TB:CORE::find_n_players_by_skill] Looking for [%d] %s player.", \
+      i + 1, weakest ? "weakest" : "strongest" \
+    );
+
+    /* "Best" as in that which satisfies requirements best. */
+    new Float:best_skill = weakest ? 99999.0 : -99999.0;
+    new best_pid = -1;
+    for (new j = 0; j != ArraySize(players); ++j) {
+      new pid = ArrayGetCell(players, j);
+
+      if (ArrayFindValue(pids, pid) != -1) {
+        LOG( \
+          "[TB:CORE::find_n_players_by_skill] Player (%d) is already present in `pids`. \
+          Skipping.", pid \
+        );
+        continue;
+      }
+
+      new Float:skill = tb_get_player_skill(pid);
+      if ((skill < best_skill && weakest) || (skill > best_skill && !weakest)) {
+        LOG( \
+          "[TB:CORE::find_n_players_by_skill] New [%d] weakest candidate: %d (%.1f). [Skill: %.1f \
+          -> %1.f]", i + 1, pid, skill, best_skill, skill \
+        );
+        best_skill = skill;
+        best_pid = pid;
+      }
+    }
+
+    if (best_pid == -1) {
+      LOG( \
+        "[TB:CORE::find_n_players_by_skill] No other candidate could be identified. \
+        Breaking out of loop." \
+      );
+      break;
+    } else {
+      LOG( \
+        "[TB:CORE::find_n_players_by_skill] Pushing %d %s player (PID: %d; skill: %.1f) onto \
+        `pids`.", \
+        i + 1, weakest ? "weakest" : "strongest", best_pid, tb_get_player_skill(best_pid) \
+      );
+      ArrayPushCell(pids, best_pid);
+    }
+  }
+
+  return pids;
+}
+
 /* Utilities */
+
+join_team(pid, CsTeams:team_id, msg_id)
+{
+  new team[2];
+  new class[2];
+  formatex(team, charsmax(team), "%d", team_id);
+  formatex(class, charsmax(class), "%d", random_num(1, 4));
+
+  new msg_block = get_msg_block(msg_id);
+  set_msg_block(msg_id, BLOCK_SET);
+  engclient_cmd(pid, "jointeam", team);
+  engclient_cmd(pid, "joinclass", class);
+  set_msg_block(msg_id, msg_block);
+}
+
+transfer_player(pid, CsTeams:team_id)
+{
+  static team_info_msgid;
+  if (team_info_msgid == 0) {
+    team_info_msgid = get_user_msgid("TeamInfo");
+  }
+  cs_set_user_team(pid, team_id, CS_NORESET, false);
+  emessage_begin(MSG_ALL, team_info_msgid);
+  ewrite_byte(pid);
+  ewrite_string(team_id == CS_TEAM_T ? "TERRORIST" : "CT");
+  emessage_end();
+}
 
 bool:pid_exists_in_pairs(Array:pairs, const pid)
 {
@@ -1061,24 +1294,33 @@ bool:is_player_immune(const pid)
     || (type == it_balance_count_based && g_balancings_invoked[pid] <= amt);
 }
 
+/* TODO: move out to common utils. */
+arr_remove_unique(Array:arr, item)
+{
+  new idx = ArrayFindValue(arr, item);
+  if (idx != -1) {
+    ArrayDeleteItem(arr, idx);
+  }
+}
+
 #if defined DEBUG
 log_team(str[], maxlen, const team[], CsTeams:team_id)
 {
-  new players[MAX_PLAYERS];
-  new playersnum = 0;
+  new Array:players = team_id == CS_TEAM_T ? g_ts : g_cts;
+  new playersnum = team_id == CS_TEAM_T ? g_tnum : g_ctnum;
 
-  get_players_ex(players, playersnum, GetPlayers_MatchTeam, team);
   formatex(
     str, maxlen,
     "%s^n  %ss (num: %d; skill: %.1f):^n", str, team, playersnum, tb_get_team_skill(team_id)
   );
   new name[MAX_NAME_LENGTH + 1];
   for (new i = 0; i != playersnum; ++i) {
-    get_user_name(players[i], name, charsmax(name));
+    new pid = ArrayGetCell(players, i);
+    get_user_name(pid, name, charsmax(name));
     formatex(
       str, maxlen,
       "%s    %d (PID: %d). %s: %.1f^n",
-      str, i, players[i], name, tb_get_player_skill(players[i])
+      str, i, pid, name, tb_get_player_skill(pid)
     );
   }
 }

@@ -18,15 +18,22 @@ enum _:PlayerData
   pd_deaths,
   pd_hs
 }
-
-new g_player_data[MAX_PLAYERS + 1][PlayerData];
 #endif // TB_BHVR_EXTERNAL_SKILL_COMPUTATION
 
 new Float:g_skill[MAX_PLAYERS + 1];
 
 new g_pcvar_recheck_skill_diff_delay;
 
+new g_xid_ts;
+new g_xid_cts;
+new g_xid_tnum;
+new g_xid_ctnum;
+
 new g_fw_skill_diff_changed;
+
+#if !defined TB_BHVR_EXTERNAL_SKILL_COMPUTATION
+new g_player_data[MAX_PLAYERS + 1][PlayerData];
+#endif // TB_BHVR_EXTERNAL_SKILL_COMPUTATION
 
 public plugin_init()
 {
@@ -41,10 +48,18 @@ public plugin_init()
   register_cvar("tb_skill_min_diff_global_delta", "60.0");
   register_cvar("tb_skill_min_diff_local_delta", "30.0");
 
+  /* XVars */
+
+  g_xid_ts       = get_xvar_id("g_ts");
+  g_xid_cts      = get_xvar_id("g_cts");
+  g_xid_tnum     = get_xvar_id("g_tnum");
+  g_xid_ctnum    = get_xvar_id("g_ctnum");
+
   /* Forwards */
 
-  g_fw_skill_diff_changed =
-    CreateMultiForward("tb_skill_diff_changed", ET_IGNORE, FP_FLOAT, FP_FLOAT);
+  g_fw_skill_diff_changed = CreateMultiForward(
+    "tb_skill_diff_changed", ET_IGNORE, FP_FLOAT, FP_FLOAT
+  );
 
 #if !defined TB_BHVR_EXTERNAL_SKILL_COMPUTATION
   /* Events */
@@ -100,6 +115,7 @@ public client_disconnected(pid, bool:drop, message[], maxlen)
 public Float:native_get_player_skill(plugin, argc)
 {
   enum { param_pid = 1 };
+  /* TODO: check if player is valid; log if not. */
   return g_skill[get_param(param_pid)];
 }
 
@@ -204,20 +220,26 @@ compute_skill(pid)
 
 CsTeams:get_stronger_team()
 {
-  return get_team_skill(CS_TEAM_CT) > get_team_skill(CS_TEAM_T) ? CS_TEAM_CT : CS_TEAM_T;
+  new Float:t_skill = get_team_skill(CS_TEAM_T);
+  new Float:ct_skill = get_team_skill(CS_TEAM_CT);
+  if (t_skill == ct_skill) {
+    /* Handle edge case wherein teams might have identical skill but differ in
+     * player count. Leaving it (determining stronger team) up to chance in this
+     * case might/will introduce issues in balancing. */
+    return get_xvar_num(g_xid_tnum) > get_xvar_num(g_xid_ctnum) ? CS_TEAM_T : CS_TEAM_CT;
+  } else {
+    return t_skill > ct_skill ? CS_TEAM_T : CS_TEAM_CT;
+  }
 }
 
 Float:get_team_skill(CsTeams:team)
 {
-  new players[MAX_PLAYERS];
-  new playersnum = 0;
-  get_players_ex(
-    players, playersnum, GetPlayers_MatchTeam, team == CS_TEAM_CT ? "CT" : "TERRORIST"
-  );
+  new Array:players = Array:(team == CS_TEAM_T ? get_xvar_num(g_xid_ts) : get_xvar_num(g_xid_cts));
+  new playersnum = team == CS_TEAM_T ? get_xvar_num(g_xid_tnum) : get_xvar_num(g_xid_ctnum);
 
   new Float:sum = 0.0;
   for (new i = 0; i != playersnum; ++i) {
-    sum += g_skill[players[i]];
+    sum += g_skill[ArrayGetCell(players, i)];
   }
 
   return sum;

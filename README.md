@@ -1,6 +1,6 @@
 # Team Balancer
 
-An [AMX Mod X](https://www.amxmodx.org/) plugin for [Counter-Strike 1.6](https://store.steampowered.com/app/10/CounterStrike/) that performs static team balancing (i.e., based on a skill rating precomputed upon connection to the server, rather than on frags/deaths accumulated throughout the game). See [§ Operation](#operation) for details.
+An [AMX Mod X](https://www.amxmodx.org/) plugin for [Counter-Strike 1.6](https://store.steampowered.com/app/10/CounterStrike/) that attempts to balance teams according to (possibly externally computed) skill rating. See [§ Operation](#operation) for details.
 
 ## Requirements
 
