@@ -116,6 +116,30 @@ enum ImmunityType
   it_balance_count_based
 }
 
+/* TB:SKILL */
+
+enum _:SkillLevel
+{
+  sl_title[32 + 1],
+  Float:sl_threshold
+}
+
+enum _:SkillLevels
+{
+  sl_level_0,
+  sl_level_1,
+  sl_level_2,
+  sl_level_3,
+  sl_level_4,
+  sl_level_5,
+  sl_level_6,
+  sl_level_7,
+  sl_level_8,
+  sl_level_9,
+  sl_level_10,
+  sl_level_11
+}
+
 /* TB:NOTIFY */
 
 /*

@@ -31,7 +31,7 @@ native tb_get_player_skill_comp(const pid, const SkillComponent:component);
  *
  * @return            Skill of player identified by `pid`.
  */
-native Float:tb_get_player_skill(const pid);
+native Float:tb_get_player_skill(const pid, level[32 + 1] = "");
 
 #if defined TB_BHVR_EXTERNAL_SKILL_COMPUTATION
 /*
@@ -43,6 +43,8 @@ native Float:tb_get_player_skill(const pid);
  * @noreturn
  */
 native tb_set_player_skill(const pid, Float:skill);
+
+native tb_set_skill_levels(Array:levels);
 #endif // TB_BHVR_EXTERNAL_SKILL_COMPUTATION
 
 /*

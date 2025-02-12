@@ -8,12 +8,14 @@
   #pragma loadlib team_balancer_core
 #endif
 
+/* Defines > Public */
+
 #define TB_VERSION  "0.1.0-beta"
 #define TB_AUTHOR   "prnl0"
 
 #define TB_DICTIONARY "team_balancer.txt"
 
-/* Behaviours */
+/* Defines > Internal */
 
 /* Delegate players skill computation to external plugin, the result of which is
  * provided to Team Balancer through the `tb_set_player_skill` native.
