@@ -358,12 +358,15 @@ show_player_skills_menu(const pid, page = 1)
     get_user_name(item_pid, name, charsmax(name));
     ellipsize(name, 20);
 
+    new skill_lvl[32 + 1];
+    new Float:skill = tb_get_player_skill(item_pid, skill_lvl);
+
     formatex(
-      body, charsmax(body), "%s%s%d. %s%s: \r%.1f %s[\r%s%s] %L^n",
+      body, charsmax(body), "%s%s%d. %s%s: \r%.1f %s[\r%s%s] [\r%s%s] %L^n",
       body, colors[1], i,
       colors[0], name,
-      tb_get_player_skill(item_pid),
-      colors[0], team, colors[0],
+      skill, colors[0], skill_lvl, colors[0],
+      team, colors[0],
       pid, item_pid == pid ? "MENU_YOU" : "GENERAL_NONE"
     );
   }

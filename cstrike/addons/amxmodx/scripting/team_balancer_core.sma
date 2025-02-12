@@ -5,13 +5,19 @@
  *     skill diff. is 4000 vs 20, don't transfer players from weaker team even
  *     though player count diff. threshold might be 2 or 3). A value of `-1`
  *     would indicate that player count diff. must always be taken into account;
- *   - don't check balance when 1v1 or less. */
+ *   - don't check balance when 1v1 or less (needs_balancing() called before
+ *     t_num and ct_num can be updated);
+ *   - [+?] if balancing failed, check every round to see if someones' immunity
+ *     ran out; if so, set `g_needs_balance_check -> true`. */
+
+#define DEBUG
 
 #include <amxmodx>
 #include <amxmisc>
 #include <fakemeta>
 #include <cellarray>
 #include <cstrike> // figure out how to avoid this (included for `cs_set_user_team`)
+#include <hamsandwich>
 
 #include <team_balancer>
 #include <team_balancer_skill>
@@ -21,7 +27,6 @@
 #define TB_PLUGIN "Team Balancer: Core"
 #define TB_CONFIG "team_balancer.cfg"
 
-#define DEBUG
 #if defined DEBUG
   #define DEBUG_DIR "addons/amxmodx/logs/others/team_balancer"
   #define LOG(%0) log_to_file(g_log_filepath, %0)
@@ -44,11 +49,16 @@
     wkr_tm_playersnum = g_ctnum;              \
     str_tm_playersnum = g_tnum;               \
   } else {                                    \
-    wkr_tm_players = g_cts;                   \
-    str_tm_players = g_ts;                    \
-    wkr_tm_playersnum = g_ctnum;              \
-    str_tm_playersnum = g_tnum;               \
+    wkr_tm_players = g_ts;                    \
+    str_tm_players = g_cts;                   \
+    wkr_tm_playersnum = g_tnum;               \
+    str_tm_playersnum = g_ctnum;              \
   }
+
+enum
+{
+  tid_spawn_player = 2316
+};
 
 new g_pcvar_balancing_strategy;
 new g_pcvar_skill_threshold;
@@ -80,6 +90,7 @@ public g_tnum;
 public g_ctnum;
 
 new bool:g_needs_balance_check;
+new bool:g_balancing_failed;
 public g_rounds_since_last_balance_check;
 
 new g_rounds_elapsed[MAX_PLAYERS + 1];
@@ -134,6 +145,7 @@ public plugin_init()
 
   register_clcmd("jointeam", "clcmd_jointeam");
   register_clcmd("joinclass", "clcmd_joinclass");
+  register_clcmd("chooseteam", "clcmd_chooseteam");
 
   /* Miscellaneous */
 
@@ -172,9 +184,12 @@ public client_putinserver(pid)
 
 public client_disconnected(pid, bool:drop, message[], maxlen)
 {
-  if (!is_user_connected(pid)) {
-    return;
-  }
+  /* TODO: this filters out clients that disconnect without first having
+   *       connected, though it appears to be interfering with the force balance
+   *       condition at the bottom. Commenting out for now. */
+  // if (!is_user_connected(pid)) {
+  //   return;
+  // }
 
   arr_remove_unique(g_players, pid);
   arr_remove_unique(g_ts, pid);
@@ -199,8 +214,8 @@ public client_disconnected(pid, bool:drop, message[], maxlen)
   new name[MAX_NAME_LENGTH + 1];
   get_user_name(pid, name, charsmax(name));
   LOG( \
-    "[TB:CORE::client_disconnected] ^"%s^" disconnected (team: %d): g_needs_balance_check -> \
-    true", name, team \
+    "[TB:CORE::client_disconnected] ^"%s^" disconnected (team: %d; skill: %.1f): \
+    g_needs_balance_check -> true", name, team, tb_get_player_skill(pid) \
   );
   LOG("[TB:CORE::client_disconnected] T count: %d; CT count: %d.", g_tnum, g_ctnum);
 #endif // DEBUG
@@ -229,6 +244,10 @@ public native_balance(plugin, argc)
   new pid = get_param(param_pid);
 
   if (pid == 0) {
+    if (!can_check_balance(.skip_delay = true)) {
+      return;
+    }
+    
     if (needs_balancing()) {
       ExecuteForward(g_fw_balance_checked, _, true);
       if (balance()) {
@@ -290,16 +309,26 @@ public message_showmenu(msg_id, msg_dest, msg_ent)
 #define INGAME_JOIN_MSG_SPEC  "#IG_Team_Select_Spect"
 #define MENU_CODE_MAXLEN      21
 
+#if defined DEBUG
+  new name[MAX_NAME_LENGTH + 1];
+  get_user_name(msg_ent, name, charsmax(name));
+#endif // DEBUG
+
   static menu_code[MENU_CODE_MAXLEN + 1];
   get_msg_arg_string(4, menu_code, charsmax(menu_code));
   if (equal(menu_code, FIRST_JOIN_MSG) || equal(menu_code, FIRST_JOIN_MSG_SPEC)) {
     new data[2]; data[0] = msg_ent; data[1] = msg_id;
+    LOG( \
+      "[TB:CORE::message_showmenu] First join team-join menu shown for ^"%s^". \
+      Forcing team join.", name \
+    );
     set_task_ex(1.0, "force_join", _, data, sizeof(data));
     return PLUGIN_HANDLED;
   /* Block team change mid-game. */
   } else if (equal(menu_code, INGAME_JOIN_MSG) || equal(menu_code, INGAME_JOIN_MSG_SPEC)) {
     /* TODO: allow admins with certain access flags to bypass this, as well as
      *       regulars if some CVar is set. */
+    LOG("[TB:CORE::message_showmenu] In-game team-join menu shown for ^"%s^". Blocking.", name);
     return PLUGIN_HANDLED;
   }
 
@@ -309,11 +338,19 @@ public message_showmenu(msg_id, msg_dest, msg_ent)
 public message_vguimenu(msg_id, msg_dest, msg_ent)
 {
 #define VGUI_JOIN_TEAM_NUM 2
+#if defined DEBUG
+  new name[MAX_NAME_LENGTH + 1];
+  get_user_name(msg_ent, name, charsmax(name));
+#endif // DEBUG
   if (get_msg_arg_int(1) == VGUI_JOIN_TEAM_NUM) {
     new data[2]; data[0] = msg_ent; data[1] = msg_id;
+    LOG( \
+      "[TB:CORE::message_vguimenu] Team-join VGUI menu shown for ^"%s^". Forcing team join.", name \
+    );
     set_task_ex(1.0, "force_join", _, data, sizeof(data));
     return PLUGIN_HANDLED;
   }
+  LOG("[TB:CORE::message_vguimenu] Non-team-join VGUI menu shown for ^"%s^". Skipping.", name);
   return PLUGIN_CONTINUE;
 }
 
@@ -321,6 +358,25 @@ public force_join(const data[2])
 {
   new pid = data[0];
   new msg_id = data[1];
+
+#if defined DEBUG
+  new name[MAX_NAME_LENGTH + 1];
+  get_user_name(pid, name, charsmax(name));
+#endif // DEBUG
+
+  if (!is_user_connected(pid)) {
+    LOG("[TB:CORE::force_join] ^"%s^" left the game. Abandoning team force.", name);
+    return;
+  }
+
+#if defined DEBUG
+  new team[2 + 1];
+  new n;
+
+  #define COPY_TEAM(%0,%1) copy(team, charsmax(team), %0 == CS_TEAM_T ? "T" : "CT"); n = %1
+#else
+  #define COPY_TEAM(%0,%1) //
+#endif // DEBUG
 
 #if defined TB_BHVR_EXTERNAL_SKILL_COMPUTATION
   new Float:skill = tb_get_player_skill(pid);
@@ -331,60 +387,41 @@ public force_join(const data[2])
   new pc_diff_threshold = get_pcvar_num(g_pcvar_player_count_threshold);
 
   if (join_t_skill_diff < join_ct_skill_diff) {
-    join_team(pid, g_tnum - g_ctnum <= pc_diff_threshold ? CS_TEAM_T : CS_TEAM_CT, msg_id);
+    join_team(pid, g_tnum - g_ctnum < pc_diff_threshold ? CS_TEAM_T : CS_TEAM_CT, msg_id);
+    COPY_TEAM((g_tnum - g_ctnum < pc_diff_threshold ? CS_TEAM_T : CS_TEAM_CT), 1);
   } else if (join_t_skill_diff > join_ct_skill_diff) {
-    join_team(pid, g_ctnum - g_tnum <= pc_diff_threshold ? CS_TEAM_CT : CS_TEAM_T, msg_id);
+    join_team(pid, g_ctnum - g_tnum < pc_diff_threshold ? CS_TEAM_CT : CS_TEAM_T, msg_id);
+    COPY_TEAM((g_ctnum - g_tnum < pc_diff_threshold ? CS_TEAM_CT : CS_TEAM_T), 2);
   } else if (g_tnum == g_ctnum) {
-    join_team(pid, CsTeams:random_num(_:CS_TEAM_T, _:CS_TEAM_CT), msg_id);
+    new CsTeams:tm = CsTeams:random_num(_:CS_TEAM_T, _:CS_TEAM_CT);
+    join_team(pid, tm, msg_id);
+    COPY_TEAM(tm, 3);
   } else {
     join_team(pid, g_tnum > g_ctnum ? CS_TEAM_CT : CS_TEAM_T, msg_id);
+    COPY_TEAM((g_tnum > g_ctnum ? CS_TEAM_CT : CS_TEAM_T), 4);
   }
 #else
   if (g_tnum == g_ctnum) {
-    join_team(pid, CsTeams:random_num(_:CS_TEAM_T, _:CS_TEAM_CT), msg_id);
+    new CsTeams:tm = CsTeams:random_num(_:CS_TEAM_T, _:CS_TEAM_CT);
+    join_team(pid, tm, msg_id);
+    COPY_TEAM(tm, 5);
   } else {
     join_team(pid, g_tnum > g_ctnum ? CS_TEAM_CT : CS_TEAM_T, msg_id);
+    COPY_TEAM((g_tnum > g_ctnum ? CS_TEAM_CT : CS_TEAM_T), 6);
   }
 #endif // TB_BHVR_EXTERNAL_SKILL_COMPUTATION
+
+#if defined DEBUG
+  LOG("[TB:CORE::force_join] Forcing ^"%s^" into %ss (%d).", name, team, n);
+#undef COPY_TEAM
+#endif // DEBUG
 }
 
 /* Events */
 
 public logevent_round_end()
 {
-  ++g_rounds_since_last_balance_check;
-
-  if (!can_check_balance()) {
-    return;
-  }
-
-  /* `g_needs_balance_check` takes precedence over rounds elapsed since last
-   * balance check. It is set under appropriate conditions when balance check
-   * trigger is either `bct_player_connect_disconnect` or
-   * `bct_skill_diff_changed`, or when a player requests a forced balancing. */
-  if (!g_needs_balance_check && get_pcvar_num(g_pcvar_balance_check_trigger) == _:bct_round) {
-    if (g_rounds_since_last_balance_check < get_pcvar_num(g_pcvar_rounds_between_balancing)) {
-      LOG( \
-        "[TB:CORE::logevent_round_end] %d more round/-s until balancing check.", \
-        get_pcvar_num(g_pcvar_rounds_between_balancing) - g_rounds_since_last_balance_check \
-      );
-      return;
-    }
-  } else if (!g_needs_balance_check) {
-    return;
-  }
-
-  if (needs_balancing()) {
-    ExecuteForward(g_fw_balance_checked, _, true);
-    balance();
-  } else {
-    ExecuteForward(g_fw_balance_checked, _, false);
-  }
-
-  increase_immunity_amt(.for_round_based_immunity = true);
-
-  g_rounds_since_last_balance_check = 0;
-  g_needs_balance_check = false;
+  set_task_ex(0.5, "task_round_end");
 }
 
 public event_join_team()
@@ -393,15 +430,18 @@ public event_join_team()
   new idx_t = ArrayFindValue(g_ts, pid);
   new idx_ct = ArrayFindValue(g_cts, pid);
   new team[2];
+  new name[MAX_NAME_LENGTH + 1];
   read_data(2, team, charsmax(team));
+  get_user_name(pid, name, charsmax(name));
 
   if (idx_t == -1 && idx_ct == -1) {
     if (team[0] != 'T' && team[0] != 'C') {
       return;
     }
 
+    /* This is valid, at least for now, since TB prevents players from choosing
+     * their team, and thus any player that is not yet a T nor CT is new. */
     if (get_pcvar_num(g_pcvar_balance_check_trigger) == _:bct_player_connect_disconnect) {
-      LOG("[TB:CORE::event_join_team] Player joined team: g_needs_balance_check -> true");
       g_needs_balance_check = true;
     }
 
@@ -410,7 +450,7 @@ public event_join_team()
     g_balancings_invoked[pid] = g_rounds_elapsed[pid];
 
 #if defined DEBUG
-    new data[1]; data[0] = pid;
+    new data[2]; data[0] = pid; data[1] = _:(team[0] == 'T' ? CS_TEAM_T : CS_TEAM_CT);
     set_task_ex(0.1, "debug_event_join_team", .parameter = data, .len = 1);
 #endif // DEBUG
 
@@ -418,12 +458,22 @@ public event_join_team()
   } else if (idx_t != -1 && team[0] != 'T') {
     ArrayDeleteItem(g_ts, idx_t);
     if (team[0] == 'C') {
+      LOG("[TB:CORE::event_join_team] ^"%s^" switched from Ts to CTs.", name);
+      LOG("[TB:CORE::event_join_team] T count: %d; CT count: %d.", g_tnum - 1, g_ctnum + 1);
       ArrayPushCell(g_cts, pid);
+    } else {
+      LOG("[TB:CORE::event_join_team] ^"%s^" left the Ts.", name);
+      LOG("[TB:CORE::event_join_team] T count: %d; CT count: %d.", g_tnum - 1, g_ctnum);
     }
   } else if (idx_ct != -1 && team[0] != 'C') {
     ArrayDeleteItem(g_cts, idx_ct);
     if (team[0] == 'T') {
+      LOG("[TB:CORE::event_join_team] ^"%s^" switched from CTs to Ts.", name);
+      LOG("[TB:CORE::event_join_team] T count: %d; CT count: %d.", g_tnum + 1, g_ctnum - 1);
       ArrayPushCell(g_ts, pid);
+    } else {
+      LOG("[TB:CORE::event_join_team] ^"%s^" left the CTs.", name);
+      LOG("[TB:CORE::event_join_team] T count: %d; CT count: %d.", g_tnum, g_ctnum - 1);
     }
   }
 
@@ -432,7 +482,7 @@ public event_join_team()
 }
 
 #if defined DEBUG
-public debug_event_join_team(data[1])
+public debug_event_join_team(data[2])
 {
   new name[MAX_NAME_LENGTH + 1];
   get_user_name(data[0], name, charsmax(name));
@@ -440,7 +490,16 @@ public debug_event_join_team(data[1])
     "[TB:CORE::debug_event_join_team] ^"%s^" connected. [Skill: %.1f]", \
     name, tb_get_player_skill(data[0]) \
   );
+  LOG( \
+    "[TB:CORE::debug_event_join_team] ^"%s^" joined the %s.", \
+    name, data[1] == _:CS_TEAM_T ? "Ts" : "CTs" \
+  );
   LOG("[TB:CORE::debug_event_join_team] T count: %d; CT count: %d.", g_tnum, g_ctnum);
+  LOG( \
+    "[TB:CORE::debug_event_join_team] T skill: %.1f; CT skill: %.1f; difference: %.1f.", \
+    tb_get_team_skill(CS_TEAM_T), tb_get_team_skill(CS_TEAM_CT), \
+    tb_get_team_skill_diff() \
+  );
 }
 
 public event_new_round()
@@ -464,13 +523,18 @@ public clcmd_joinclass(pid)
   return PLUGIN_HANDLED_MAIN;
 }
 
+public clcmd_chooseteam(pid)
+{
+  return PLUGIN_HANDLED_MAIN;
+}
+
 /* Main logic */
 
-bool:can_check_balance()
+bool:can_check_balance(bool:skip_delay = false)
 {
-  if (get_gametime() < get_pcvar_float(g_pcvar_delay_before_start)) {
+  if (!skip_delay && get_gametime() < get_pcvar_float(g_pcvar_delay_before_start)) {
     LOG( \
-      "[TB:CORE::logevent_round_end] Round ended before tb_delay_before_start (%.1f s) elapsed \
+      "[TB:CORE::can_check_balance] Round ended before tb_delay_before_start (%.1f s) elapsed \
       (%.1f s left). Leaving.", \
       get_pcvar_float(g_pcvar_delay_before_start), \
       get_pcvar_float(g_pcvar_delay_before_start) - get_gametime() \
@@ -480,7 +544,7 @@ bool:can_check_balance()
 
   if (g_ctnum <= 1 && g_tnum <= 1) {
     LOG( \
-      "[TB:CORE::logevent_round_end] CTs and Ts have 1 or less players each. Won't balance. \
+      "[TB:CORE::can_check_balance] CTs and Ts have 1 or less players each. Won't balance. \
       Leaving." \
     );
     return false;
@@ -607,6 +671,7 @@ bool:balance(bool:inform = true)
   }
 
   if (final_pids == Invalid_Array || ArraySize(final_pids) == 0) {
+    g_balancing_failed = true;
     LOG("[TB:CORE::balance] Balancing failed.");
     ExecuteForward(g_fw_balancing_failed);
     ArrayDestroy(final_pids);
@@ -616,11 +681,10 @@ bool:balance(bool:inform = true)
     return false;
   }
 
-  if (final_transfer_type == tt_switch) {
+  if (final_transfer_type == tt_switch)
     switch_players(final_pids, inform);
-  } else {
+  else
     transfer_players(final_pids, inform);
-  }
 
 #if defined DEBUG
   g_balanced = true;
@@ -700,13 +764,12 @@ Array:find_transfers(TransferType:transfer_type, &Float:new_diff)
   /* Initially, new diff. is the base diff. */
   new_diff = tb_get_team_skill_diff();
 
-  if (transfer_type == tt_simple_unidir) {
+  if (transfer_type == tt_simple_unidir)
     return find_simple_unidir_transfers(new_diff, str_tm_players, wkr_tm_playersnum);
-  } else if (transfer_type == tt_chain_evaluated_unidir) {
+  else if (transfer_type == tt_chain_evaluated_unidir)
     return find_chain_evaluated_unidir_transfers(new_diff, str_tm_players, wkr_tm_playersnum);
-  } else {
+  else
     return find_switches(new_diff, str_tm_players, wkr_tm_players);
-  }
 }
 
 Array:find_simple_unidir_transfers(&Float:new_diff, Array:str_tm_players, wkr_tm_playersnum) {
@@ -902,9 +965,8 @@ Array:find_chain_evaluated_unidir_transfers(
           break;
         }
       }
-      if (end) {
+      if (end)
         break;
-      }
 
       /* Generate next sequence.
        *
@@ -913,9 +975,8 @@ Array:find_chain_evaluated_unidir_transfers(
       for (new j = 1; j != n; ++j) {
         if (ArrayGetCell(seq, n - j) == str_tm_playersnum - j + 1) {
           ArraySetCell(seq, n - j - 1, ArrayGetCell(seq, n - j - 1) + 1);
-          for (new k = n - j; k != n; ++k) {
+          for (new k = n - j; k != n; ++k)
             ArraySetCell(seq, k, ArrayGetCell(seq, k - 1) + 1);
-          }
         }
       }
     }
@@ -930,9 +991,8 @@ Array:find_chain_evaluated_unidir_transfers(
     );
     new_diff = floatabs(best_diff);
     new Array:pids = ArrayCreate();
-    for (new i = 0; i != ArraySize(best_seq); ++i) {
+    for (new i = 0; i != ArraySize(best_seq); ++i)
       ArrayPushCell(pids, ArrayGetCell(str_tm_players, ArrayGetCell(best_seq, i)));
-    }
     LOG( \
       "[TB:CORE::find_chain_evaluated_unidir_transfers] Size of `pids`: %d", ArraySize(pids) \
     );
@@ -1077,16 +1137,31 @@ increase_immunity_amt(bool:for_round_based_immunity)
     return;
   }
 
+  new amt = get_pcvar_num(g_pcvar_immunity_amount);
   for (new i = 0; i != g_pnum; ++i) {
     new pid = ArrayGetCell(g_players, i);
     if (for_round_based_immunity) {
-      ++g_rounds_elapsed[pid];
+      if (++g_rounds_elapsed[pid] > amt && g_balancing_failed) {
+        LOG( \
+          "[TB:CORE::increase_immunity_amt] %d ran out of immunity, and last balancing failed: \
+          g_needs_balance_check -> true" \
+        );
+        g_balancing_failed = false;
+        g_needs_balance_check = true;
+      }
       LOG( \
         "[TB:CORE::increase_immunity_amt] Increasing rounds elapsed since they were last balanced \
         for %d: %d -> %d", pid, g_rounds_elapsed[pid] - 1, g_rounds_elapsed[pid] \
       );
     } else {
-      ++g_balancings_invoked[pid];
+      if (++g_balancings_invoked[pid] > amt && g_balancing_failed) {
+        LOG( \
+          "[TB:CORE::increase_immunity_amt] %d ran out of immunity, and last balancing failed: \
+          g_needs_balance_check -> true", pid \
+        );
+        g_balancing_failed = false;
+        g_needs_balance_check = true;
+      }
       LOG( \
         "[TB:CORE::increase_immunity_amt] Increasing balancings invoked since they were last \
         balanced for %d: %d -> %d", pid, g_balancings_invoked[pid] - 1, g_balancings_invoked[pid] \
@@ -1168,12 +1243,13 @@ switch_players(&Array:pairs, bool:inform = true)
 }
 
 /* TODO: further generalize and use in balancing algorithms? */
-Array:find_n_players_by_skill(const Array:players, n, bool:weakest)
+Array:find_n_players_by_skill(Array:players, n, bool:weakest)
 {
   new Array:pids = ArrayCreate();
   LOG( \
-    "[TB:CORE::find_n_players_by_skill] Looking for up to %d %s players in single team.", \
-    n, weakest ? "weakest" : "strongest" \
+    "[TB:CORE::find_n_players_by_skill] Looking for up to %d %s players in single team \
+    (players: %d).", \
+    n, weakest ? "weakest" : "strongest", ArraySize(players) \
   );
 
   for (new i = 0; i != n; ++i) {
@@ -1199,11 +1275,13 @@ Array:find_n_players_by_skill(const Array:players, n, bool:weakest)
       new Float:skill = tb_get_player_skill(pid);
       if ((skill < best_skill && weakest) || (skill > best_skill && !weakest)) {
         LOG( \
-          "[TB:CORE::find_n_players_by_skill] New [%d] weakest candidate: %d (%.1f). [Skill: %.1f \
-          -> %1.f]", i + 1, pid, skill, best_skill, skill \
+          "[TB:CORE::find_n_players_by_skill] New [%d] %s candidate: %d (%.1f). [Skill: %.1f \
+          -> %1.f]", i + 1, weakest ? "weakest" : "strongest", pid, skill, best_skill, skill \
         );
         best_skill = skill;
         best_pid = pid;
+      } else {
+        LOG("[TB:CORE::find_n_players_by_skill] %d doesn't satisfy requirements. Skipping.", pid);
       }
     }
 
@@ -1226,28 +1304,65 @@ Array:find_n_players_by_skill(const Array:players, n, bool:weakest)
   return pids;
 }
 
+/* Tasks */
+
+public task_round_end()
+{
+  ++g_rounds_since_last_balance_check;
+
+  if (!can_check_balance()) {
+    return;
+  }
+
+  /* `g_needs_balance_check` takes precedence over rounds elapsed since last
+   * balance check. It is set under appropriate conditions when balance check
+   * trigger is either `bct_player_connect_disconnect` or
+   * `bct_skill_diff_changed`, or when a player requests a forced balancing. */
+  if (!g_needs_balance_check && get_pcvar_num(g_pcvar_balance_check_trigger) == _:bct_round) {
+    if (g_rounds_since_last_balance_check < get_pcvar_num(g_pcvar_rounds_between_balancing)) {
+      LOG( \
+        "[TB:CORE::logevent_round_end] %d more round/-s until balancing check.", \
+        get_pcvar_num(g_pcvar_rounds_between_balancing) - g_rounds_since_last_balance_check \
+      );
+      return;
+    }
+  } else if (!g_needs_balance_check) {
+    return;
+  }
+
+  if (needs_balancing()) {
+    ExecuteForward(g_fw_balance_checked, _, true);
+    balance();
+  } else {
+    ExecuteForward(g_fw_balance_checked, _, false);
+  }
+
+  increase_immunity_amt(.for_round_based_immunity = true);
+
+  g_rounds_since_last_balance_check = 0;
+  g_needs_balance_check = false;
+}
+
 /* Utilities */
 
 join_team(pid, CsTeams:team_id, msg_id)
 {
-  new team[2];
-  new class[2];
-  formatex(team, charsmax(team), "%d", team_id);
-  formatex(class, charsmax(class), "%d", random_num(1, 4));
-
   new msg_block = get_msg_block(msg_id);
   set_msg_block(msg_id, BLOCK_SET);
+
+  new team[2];
+  formatex(team, charsmax(team), "%d", team_id);
   engclient_cmd(pid, "jointeam", team);
-  engclient_cmd(pid, "joinclass", class);
+  engclient_cmd(pid, "joinclass", "1");
+
   set_msg_block(msg_id, msg_block);
 }
 
 transfer_player(pid, CsTeams:team_id)
 {
   static team_info_msgid;
-  if (team_info_msgid == 0) {
+  if (!team_info_msgid)
     team_info_msgid = get_user_msgid("TeamInfo");
-  }
   cs_set_user_team(pid, team_id, CS_NORESET, false);
   emessage_begin(MSG_ALL, team_info_msgid);
   ewrite_byte(pid);
@@ -1260,9 +1375,8 @@ bool:pid_exists_in_pairs(Array:pairs, const pid)
   for (new i = 0; i != ArraySize(pairs); ++i) {
     new pair[2];
     ArrayGetArray(pairs, i, pair);
-    if (pair[0] == pid || pair[1] == pid) {
+    if (pair[0] == pid || pair[1] == pid)
       return true;
-    }
   }
   return false;
 }

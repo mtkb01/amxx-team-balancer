@@ -9,7 +9,6 @@
 #define TB_PLUGIN "Team Balancer: Notify"
 
 new g_pcvar_prefix;
-new g_pcvar_print_names_to_console;
 new g_pcvar_info_checking;
 new g_pcvar_info_balance_check_results;
 new g_pcvar_info_forced_balancing;
@@ -27,7 +26,6 @@ public plugin_init()
   /* CVars */
 
   g_pcvar_prefix                      = register_cvar("tb_info_prefix", "^4[TB]^1 ");
-  g_pcvar_print_names_to_console      = register_cvar("tb_info_print_names_to_console", "0");
   g_pcvar_info_checking               = register_cvar("tb_info_checking_balance", "1");
   g_pcvar_info_balance_check_results  = register_cvar("tb_info_balance_check_results", "1");
   g_pcvar_info_forced_balancing       = register_cvar("tb_info_forced_balancing", "1");
@@ -142,21 +140,8 @@ public tb_players_transferred(Array:pids, CsTeams:dst)
       0, print_team_default,
       "%s%L %L", g_prefix,
       LANG_PLAYER, "CHAT_N_PLAYERS_TRANSFERRED", ArraySize(pids), dst == CS_TEAM_CT ? "CT" : "T",
-      LANG_PLAYER, get_pcvar_bool(g_pcvar_print_names_to_console)
-        ? "CHAT_SEE_CONSOLE" : "GENERAL_NONE"
+      LANG_PLAYER, "GENERAL_NONE"
     );
-
-    if (get_pcvar_bool(g_pcvar_print_names_to_console)) {
-      new name[MAX_NAME_LENGTH + 1];
-      new msg[(MAX_PLAYERS/2 - 1) * (MAX_NAME_LENGTH + 1) + (40 + 1) * 2 + 1];
-      formatex(msg, charsmax(msg), "^n----------------------------------------^n");
-      for (new i = 0; i != ArraySize(pids); ++i) {
-        get_user_name(ArrayGetCell(pids, i), name, charsmax(name));
-        formatex(msg, charsmax(msg), "%s%s^n", msg, name);
-      }
-      formatex(msg, charsmax(msg), "%s----------------------------------------^n^n", msg);
-      con_print(0, msg);
-    }
   }
 }
 
@@ -185,25 +170,8 @@ public tb_players_switched(Array:pids)
       0, print_team_default,
       "%s%L %L", g_prefix,
       LANG_PLAYER, "CHAT_N_PLAYERS_SWITCHED", ArraySize(pids)*2,
-      LANG_PLAYER, get_pcvar_bool(g_pcvar_print_names_to_console)
-        ? "CHAT_SEE_CONSOLE" : "GENERAL_NONE"
+      LANG_PLAYER, "GENERAL_NONE"
     );
-
-    if (get_pcvar_bool(g_pcvar_print_names_to_console)) {
-      new name[MAX_NAME_LENGTH + 1];
-      new msg[512*3 + 1];
-      formatex(msg, charsmax(msg), "^n----------------------------------------^n");
-      for (new i = 0; i != ArraySize(pids); ++i) {
-        new pair[2];
-        ArrayGetArray(pids, i, pair);
-        get_user_name(pair[0], name, charsmax(name));
-        formatex(msg, charsmax(msg), "%s%s <-> ", msg, name);
-        get_user_name(pair[1], name, charsmax(name));
-        formatex(msg, charsmax(msg), "%s%s^n", msg, name);
-      }
-      formatex(msg, charsmax(msg), "%s----------------------------------------^n^n", msg);
-      con_print(0, msg);
-    }
   }
 }
 
